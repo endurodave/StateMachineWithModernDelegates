@@ -52,7 +52,7 @@ void SelfTestEngine::Start(const StartData* data)
     if (m_thread.GetThreadId() != WorkerThread::GetCurrentThreadId())
     {
         // Create an asynchronous delegate and reinvoke the function call on m_thread
-        Delegate&lt;void(const StartData*&gt;)&amp; delegate = MakeDelegate(this, &amp;SelfTestEngine::Start, m_thread);
+        auto delegate = MakeDelegate(this, &amp;SelfTestEngine::Start, m_thread);
         delegate(data);
         return;
     }
@@ -177,34 +177,34 @@ STATE_DEFINE(SelfTest, Failed, NoEventData)
 <p>The <code>Timer </code>class provides a common mechanism to receive function callbacks by registering with <code>Expired</code>. <code>Start()</code> starts the callbacks at a particular interval. <code>Stop()</code> stops the callbacks.</p>
 
 <pre lang="c++">
+/// @brief A timer class provides periodic timer callbacks on the client's 
+/// thread of control. Timer is thread safe.
 class Timer 
 {
 public:
-    static const DWORD MS_PER_TICK;
+	/// Client's register with Expired to get timer callbacks
+	SinglecastDelegate<void(void)> Expired;
 
-    /// Client&#39;s register with Expired to get timer callbacks
-    SinglecastDelegate0&lt;&gt; Expired;
+	/// Constructor
+	Timer(void);
 
-    /// Constructor
-    Timer(void);
+	/// Destructor
+	~Timer(void);
 
-    /// Destructor
-    ~Timer(void);
+	/// Starts a timer for callbacks on the specified timeout interval.
+	/// @param[in]	timeout - the timeout in milliseconds.
+	void Start(std::chrono::milliseconds timeout);
 
-    /// Starts a timer for callbacks on the specified timeout interval.
-    /// @param[in]    timeout - the timeout in milliseconds.
-    void Start(DWORD timeout);
-
-    /// Stops a timer.
-    void Stop();
+	/// Stops a timer.
+	void Stop();
 ...</pre>
 
 <p>All <code>Timer </code>instances are stored in a private static list. The <code>WorkerThread::Process()</code> loop periodically services all the timers within the list by calling <code>Timer::ProcessTimers()</code>. Client&rsquo;s registered with <code>Expired </code>are invoked whenever the timer expires.</p>
 
 <pre lang="c++">
-     case WM_USER_TIMER:
-         Timer::ProcessTimers();
-         break;</pre>
+        case MSG_TIMER:
+            Timer::ProcessTimers();
+            break;</pre>
 
 <h2>Poll Events</h2>
 
