@@ -1,23 +1,17 @@
 # C++ State Machine with Asynchronous Multicast Delegates
 A framework combining C++ state machines with asynchronous multicast delegates.
 
-Originally published on CodeProject at: <a href="https://www.codeproject.com/Articles/1165243/Cplusplus-State-Machine-with-Asynchronous-Multicas"><strong>C++ State Machine with Asynchronous Multicast Delegates</strong></a>
-
 <h2>Introduction</h2>
 
 <p>A software-based Finite State Machines (FSM) is an implementation method used to decompose a design into states and events. Simple embedded devices with no operating system employ single threading such that the state machines run on a single &ldquo;thread&rdquo;. More complex systems use multithreading to divvy up the processing.</p>
 
 <p>Many FSM implementations exist including one I wrote about here on Code Project entitled &ldquo;<a href="http://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus"><strong>State Machine Design in C++</strong></a>&rdquo;. The article covers how to create C++ state machines using the <code>StateMachine</code> base class. What is missing, however, is how to integrate multiple state machines into the context of a multithreaded environment.</p>
 
-<p>&ldquo;<a href="https://www.codeproject.com/Articles/1160934/Asynchronous-Multicast-Delegates-in-Cplusplus"><strong>Asynchronous Multicast Delegates in C++</strong></a>&rdquo; is another article I wrote on Code Project. This design provides a C++ delegate library that is capable of synchronous and asynchronous invocations on any callable function.</p>
+<p>&ldquo;<a href="https://www.codeproject.com/Articles/5277036/Asynchronous-Multicast-Delegates-in-Modern-Cpluspl"><strong>Asynchronous Multicast Delegates in Modern C++</strong></a>&rdquo; is another article I wrote on Code Project. This design provides a C++ delegate library that is capable of synchronous and asynchronous invocations on any callable function.</p>
 
 <p>This article combines the two previously described techniques, state machines and asynchronous multicast delegates, into a single project. In the previous articles, it may not be readily apparent using simple examples how multiple state machines coordinate activities and dispatch events to each other. The goal for the article is to provide a complete working project with threads, timers, events, and state machines all working together. To illustrate the concept, the example project implements a state-based self-test engine utilizing asynchronous communication between threads.</p>
 
 <p>I won&rsquo;t be re-explaining the <code>StateMachine</code> and <code>Delegate&lt;&gt;</code> implementations as the prior articles do that already. The primary focus is on how to combine the state machine and delegates into a single framework.</p>
-
-<p>This article is similar in concept to my article &ldquo;<a href="https://www.codeproject.com/Articles/1156423/Cplusplus-State-Machine-with-Threads"><strong>C++ State Machine with Threads</strong></a>&rdquo;. That article utilized <code>AsyncCallback&lt;&gt;</code> for the inter-thread messaging whereas this article utilizes <code>Delegate&lt;&gt;</code>. <code>AsyncCallback&lt;&gt;</code> is a simple, compact implementation with limited callback function types and signatures. The advantage of <code>AsyncCallback&lt;&gt;</code> is that the implementation is more compact and simple at the expense of only being able to target free or static functions with a single function agrument. The <code>Delegate&lt;&gt;</code> implementation illustrated here allows asynchronous callbacks on any function type, including member functions, with any function signature thus simplifying integration with <code>StateMachine</code>.&nbsp;</p>
-
-<p>Visual Studio 2008 and 2015 projects are included for easy experimentation. Two threading models are supported: Win32 and <code>std::thread</code>. Both implementations include the necessary threads, locks, message queues, and timers for easy porting to other embedded or PC-based systems.</p>
 
 <h2>Asynchronous Delegate Callbacks</h2>
 
@@ -29,7 +23,7 @@ Originally published on CodeProject at: <a href="https://www.codeproject.com/Art
 
 <p>The first place it&#39;s used is within the <code>SelfTest</code> class where the <code>SelfTest::CompletedCallback</code>&nbsp;delegate container allows subscribers to add delegates. Whenever a self-test completes a <code>SelfTest::CompletedCallback</code> callback is invoked notifying&nbsp;registered clients. <code>SelfTestEngine</code> registers with both&nbsp;<code>CentrifugeTest</code> and <code>PressureTest</code> to get asynchronously informed when the test is complete.</p>
 
-<p>The second location is the user interface registers&nbsp;with <code>SelfTestEngine::StatusCallback</code>. This allows a client, running on another thread, to register and receive status callbacks during execution. <code>MulticastDelegateSafe1&lt;&gt;</code> allows the client to specify the exact callback thread making is easy to avoid cross-threading errors.</p>
+<p>The second location is the user interface registers&nbsp;with <code>SelfTestEngine::StatusCallback</code>. This allows a client, running on another thread, to register and receive status callbacks during execution. <code>MulticastDelegateSafe&lt;&gt;</code> allows the client to specify the exact callback thread making is easy to avoid cross-threading errors.</p>
 
 <p>The final location is within the <code>Timer</code> class, which fires periodic callbacks on a registered callback function. A generic, low-speed timer capable of calling a function on the client-specified thread is quite useful for event driven state machines where you might want to poll for some condition to occur. In this case, the <code>Timer</code> class is used to inject poll events into the state machine instances.</p>
 
@@ -58,7 +52,7 @@ void SelfTestEngine::Start(const StartData* data)
     if (m_thread.GetThreadId() != WorkerThread::GetCurrentThreadId())
     {
         // Create an asynchronous delegate and reinvoke the function call on m_thread
-        Delegate1&lt;const StartData*&gt;&amp; delegate = MakeDelegate(this, &amp;SelfTestEngine::Start, &amp;m_thread);
+        Delegate&lt;void(const StartData*&gt;)&amp; delegate = MakeDelegate(this, &amp;SelfTestEngine::Start, m_thread);
         delegate(data);
         return;
     }
@@ -83,7 +77,7 @@ class SelfTestEngine : public SelfTest
 {
 public:
     // Clients register for asynchronous self-test status callbacks
-    static MulticastDelegateSafe1&lt;const SelfTestStatus&amp;&gt; StatusCallback;
+    static MulticastDelegateSafe&lt;void(const SelfTestStatus&amp;)&gt; StatusCallback;
 
     // Singleton instance of SelfTestEngine
     static SelfTestEngine&amp; GetInstance();
@@ -139,10 +133,10 @@ SelfTestEngine::SelfTestEngine() :
     m_thread(&quot;SelfTestEngine&quot;)
 {
     // Register for callbacks when sub self-test state machines complete or fail
-    m_centrifugeTest.CompletedCallback += MakeDelegate(this, &amp;SelfTestEngine::Complete, &amp;m_thread);
-    m_centrifugeTest.FailedCallback += MakeDelegate&lt;SelfTest&gt;(this, &amp;SelfTest::Cancel, &amp;m_thread);
-    m_pressureTest.CompletedCallback += MakeDelegate(this, &amp;SelfTestEngine::Complete, &amp;m_thread);
-    m_pressureTest.FailedCallback += MakeDelegate&lt;SelfTest&gt;(this, &amp;SelfTest::Cancel, &amp;m_thread);
+    m_centrifugeTest.CompletedCallback += MakeDelegate(this, &amp;SelfTestEngine::Complete, m_thread);
+    m_centrifugeTest.FailedCallback += MakeDelegate&lt;SelfTest&gt;(this, &amp;SelfTest::Cancel, m_thread);
+    m_pressureTest.CompletedCallback += MakeDelegate(this, &amp;SelfTestEngine::Complete, m_thread);
+    m_pressureTest.FailedCallback += MakeDelegate&lt;SelfTest&gt;(this, &amp;SelfTest::Cancel, m_thread);
 }</pre>
 
 <p>The <code>SelfTest&nbsp;</code>base class generates the <code>CompletedCallback </code>and <code>FailedCallback </code>within the <code>Completed </code>and <code>Failed</code> states respectively as seen below:</p>
@@ -212,18 +206,6 @@ public:
          Timer::ProcessTimers();
          break;</pre>
 
-<h2>Win32 and std::thread Worker Threads</h2>
-
-<p>The source code provides two alternative <code>WorkerThread </code>implementations. The Win32 version is contained within <strong>WorkerThreadWin.cpp/h</strong> and relies upon the Windows API. The <code>std::thread</code> version is located at <strong>WorkerThreadStd.cpp/h</strong> and uses the C++11 threading features. One of the two implementations is selected by defining either <code>USE_WIN32_THREADS </code>or <code>USE_STD_THREADS </code>located within <strong>DelegateOpt.h</strong>.</p>
-
-<p>See <a href="http://www.codeproject.com/Articles/1095196/Win-Thread-Wrapper-with-Synchronized-Start"><strong>Win32 Thread Wrapper with Synchronized Start </strong></a>and <a href="http://www.codeproject.com/Articles/1169105/Cplusplus-std-thread-Event-Loop-with-Message-Queue"><strong>C++ std::thread Event Loop with Message Queue&nbsp;and Timer</strong></a> for more information about the underlying thread class implementations.</p>
-
-<h2>Heap vs. Pool</h2>
-
-<p>On some projects it is not desirable to utilize the heap to retrieve dynamic storage. Maybe the project is mission critical and the risk of a memory fault due to a fragmented heap in unacceptable. Or maybe heap overhead and nondeterministic execution is considered too great. Either way, the project includes a fixed block memory allocator to divert all memory allocations to a fixed block allocator. Enable the fixed block allocator on the delegate library by defining <code>USE_XALLOCATOR </code>in <strong>DelegateOpt.h</strong>. To enable the allocator on state machines, uncomment <code>XALLOCATOR </code>in <strong>StateMachine.h</strong>.</p>
-
-<p>See <a href="https://www.codeproject.com/Articles/1084801/Replace-malloc-free-with-a-Fast-Fixed-Block-Memory"><strong>Replace malloc/free with a Fast Fixed Block Memory Allocator </strong></a>for more information on <code>xallocator</code>.</p>
-
 <h2>Poll Events</h2>
 
 <p><code>CentrifugeTest </code>has a <code>Timer<strong> </strong></code>instance and registers for callbacks. The callback function, a thread instance and a this pointer is provided to <code>Register()</code> facilitating the asynchronous callback mechanism.</p>
@@ -275,7 +257,7 @@ void SelfTestEngineStatusCallback(const SelfTestStatus&amp; status)
 
 <pre>
 SelfTestEngine::StatusCallback += 
-&nbsp;     MakeDelegate(&amp;SelfTestEngineStatusCallback, &amp;userInterfaceThread);</pre>
+&nbsp;     MakeDelegate(&amp;SelfTestEngineStatusCallback, userInterfaceThread);</pre>
 
 <p>The user interface thread here is just used to simulate callbacks to a GUI library normally running in a separate thread of control.</p>
 
@@ -291,9 +273,9 @@ int main(void)
     SelfTestEngine::GetInstance().GetThread().CreateThread();
 
     // Register for self-test engine callbacks
-    SelfTestEngine::StatusCallback += MakeDelegate(&amp;SelfTestEngineStatusCallback, &amp;userInterfaceThread);
+    SelfTestEngine::StatusCallback += MakeDelegate(&amp;SelfTestEngineStatusCallback, userInterfaceThread);
     SelfTestEngine::GetInstance().CompletedCallback += 
-&nbsp;        MakeDelegate(&amp;SelfTestEngineCompleteCallback, &amp;userInterfaceThread);
+&nbsp;        MakeDelegate(&amp;SelfTestEngineCompleteCallback, userInterfaceThread);
     
     // Start the worker threads
     ThreadWin::StartAllThreads();
@@ -308,9 +290,9 @@ int main(void)
         Sleep(10);
 
     // Unregister for self-test engine callbacks
-    SelfTestEngine::StatusCallback -= MakeDelegate(&amp;SelfTestEngineStatusCallback, &amp;userInterfaceThread);
+    SelfTestEngine::StatusCallback -= MakeDelegate(&amp;SelfTestEngineStatusCallback, userInterfaceThread);
     SelfTestEngine::GetInstance().CompletedCallback -= 
-&nbsp;        MakeDelegate(&amp;SelfTestEngineCompleteCallback, &amp;userInterfaceThread);
+&nbsp;        MakeDelegate(&amp;SelfTestEngineCompleteCallback, userInterfaceThread);
 
     // Exit the worker threads
     userInterfaceThread.ExitThread();
@@ -352,12 +334,9 @@ void SelfTestEngineCompleteCallback()
 
 <ul>
 	<li><a href="http://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus"><strong>State Machine Design in C++</strong></a> - by David Lafreniere</li>
-	<li><a href="https://www.codeproject.com/Articles/1160934/Asynchronous-Multicast-Delegates-in-Cplusplus"><strong>Asynchronous Multicast Delegates in C++</strong></a> - by David Lafreniere</li>
+    <li><a href="https://www.codeproject.com/Articles/5277036/Asynchronous-Multicast-Delegates-in-Modern-Cpluspl"><strong>Asynchronous Multicast Delegates in Modern C++</strong></a> - by David Lafreniere</li>
 	<li><a href="https://www.codeproject.com/Articles/1156423/Cplusplus-State-Machine-with-Threads"><strong>C++ State Machine with Threads</strong></a> &ndash; by David Lafreniere</li>
-	<li><a href="http://www.codeproject.com/Articles/1092727/Asynchronous-Multicast-Callbacks-with-Inter-Thread"><strong>Asynchronous Multicast Callbacks with Inter-Thread Messaging</strong></a> - by David Lafreniere</li>
-	<li><strong><a href="http://www.codeproject.com/Articles/1169105/Cplusplus-std-thread-Event-Loop-with-Message-Queue">C++ std::thread Event Loop with Message Queue and Timer</a></strong> - by David Lafreniere</li>
-	<li><a href="https://www.codeproject.com/Articles/1095196/Win-Thread-Wrapper-with-Synchronized-Start"><strong>Win32 Thread Wrapper with Synchronized Start </strong></a>- by David Lafreniere</li>
-	<li><a href="http://www.codeproject.com/Articles/1084801/Replace-malloc-free-with-a-Fast-Fixed-Block-Memory"><strong>Replace malloc/free with a Fast Fixed Block Memory Allocator </strong></a>- by David Lafreniere</li>
+	<li><a href="http://www.codeproject.com/Articles/1169105/Cplusplus-std-thread-Event-Loop-with-Message-Queue">C++ std::thread Event Loop with Message Queue and Timer</a> - by David Lafreniere</li>
 </ul>
 
 
