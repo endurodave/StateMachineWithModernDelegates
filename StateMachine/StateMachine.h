@@ -11,7 +11,7 @@
 // The state machine will automatically delete the EventData pointer during state execution. 
 // When defined, clients must not heap allocate EventData with operator new. InternalEvent() 
 // used inside the state machine always heap allocates event data. 
-//#define EXTERNAL_EVENT_NO_HEAP_DATA 1
+#define EXTERNAL_EVENT_NO_HEAP_DATA 1
 
 // See http://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus
 

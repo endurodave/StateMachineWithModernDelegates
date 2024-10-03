@@ -59,7 +59,7 @@ int main(void)
 
 	// Wait for self-test engine to complete 
 	while (!selfTestEngineCompleted)
-		Sleep(10);
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
 	// Unregister for self-test engine callbacks
 	SelfTestEngine::StatusCallback -= MakeDelegate(&SelfTestEngineStatusCallback, userInterfaceThread);
