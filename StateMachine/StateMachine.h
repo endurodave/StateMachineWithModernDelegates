@@ -11,14 +11,13 @@
 // The state machine will automatically delete the EventData pointer during state execution. 
 // When defined, clients must not heap allocate EventData with operator new. InternalEvent() 
 // used inside the state machine always heap allocates event data. 
-#define EXTERNAL_EVENT_NO_HEAP_DATA 1
+//#define EXTERNAL_EVENT_NO_HEAP_DATA 1
 
 // See http://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus
 
 // Uncomment the include below the XALLOCATOR line to use the xallocator instead 
 // of the global heap. Any EventData, or derived class thereof, created with 
 // new/delete will be routed to the xallocator. See xallocator.h for more info. 
-// See https://www.codeproject.com/Articles/1084801/Replace-malloc-free-with-a-Fast-Fixed-Block-Memory
 //#include "xallocator.h"
 
 /// @beief Unique state machine event data must inherit from this class.
@@ -288,7 +287,7 @@ private:
     ExternalEvent(TRANSITIONS[GetCurrentState()], data); \
 	C_ASSERT((sizeof(TRANSITIONS)/sizeof(BYTE)) == ST_MAX_STATES); 
 
-#define SUBCLASS_TRANSITION(state) \
+#define PARENT_TRANSITION(state) \
 	if (GetCurrentState() >= ST_MAX_STATES && \
 		GetCurrentState() < GetMaxStates()) { \
 		ExternalEvent(state); \
