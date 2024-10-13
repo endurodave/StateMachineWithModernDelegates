@@ -1,6 +1,8 @@
 # C++ State Machine with Asynchronous Multicast Delegates
 A framework combining C++ state machines with asynchronous multicast delegates.
 
+<p><a href="https://www.cmake.org/">CMake</a>&nbsp;is used to create the build files. CMake is free and open-source software. Windows, Linux and other toolchains are supported. See the <strong>CMakeLists.txt </strong>file for more information.</p>
+
 <h2>Introduction</h2>
 
 <p>A software-based Finite State Machines (FSM) is an implementation method used to decompose a design into states and events. Simple embedded devices with no operating system employ single threading such that the state machines run on a single &ldquo;thread&rdquo;. More complex systems use multithreading to divvy up the processing.</p>
