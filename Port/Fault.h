@@ -5,6 +5,9 @@
 extern "C" {
 #endif
 
+// Hide Windows C_ASSERT redefinition warning
+#pragma warning(disable:4005)
+
 // Used for compile-time checking for array sizes. On Windows VC++, you get 
 // an "error C2118: negative subscript" error.
 #ifndef C_ASSERT
