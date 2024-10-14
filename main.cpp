@@ -4,9 +4,8 @@
 #include "WorkerThreadStd.h"
 #include "DataTypes.h"
 
+// @see https://github.com/endurodave/StateMachineWithModernDelegates
 // David Lafreniere
-// https://www.codeproject.com/Articles/1165243/Cplusplus-State-Machine-with-Asynchronous-Multicas
-// https://www.codeproject.com/Articles/5277036/Asynchronous-Multicast-Delegates-in-Modern-Cpluspl
 
 using namespace std;
 using namespace DelegateLib;
