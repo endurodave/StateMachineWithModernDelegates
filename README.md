@@ -1,7 +1,5 @@
-# C++ State Machine with Asynchronous Multicast Delegates
+# C++ State Machine with Modern Asynchronous Multicast Delegates
 A framework combining C++ state machines with asynchronous multicast delegates.
-
-<p><a href="https://www.cmake.org/">CMake</a>&nbsp;is used to create the build files. CMake is free and open-source software. Windows, Linux and other toolchains are supported. See the <strong>CMakeLists.txt </strong>file for more information.</p>
 
 <h2>Introduction</h2>
 
@@ -14,6 +12,15 @@ A framework combining C++ state machines with asynchronous multicast delegates.
 <p>This article combines the two previously described techniques, state machines and asynchronous multicast delegates, into a single project. In the previous articles, it may not be readily apparent using simple examples how multiple state machines coordinate activities and dispatch events to each other. The goal for the article is to provide a complete working project with threads, timers, events, and state machines all working together. To illustrate the concept, the example project implements a state-based self-test engine utilizing asynchronous communication between threads.</p>
 
 <p>I won&rsquo;t be re-explaining the <code>StateMachine</code> and <code>Delegate&lt;&gt;</code> implementations as the prior articles do that already. The primary focus is on how to combine the state machine and delegates into a single framework.</p>
+
+<p><a href="https://www.cmake.org/">CMake</a>&nbsp;is used to create the build files. CMake is free and open-source software. Windows, Linux and other toolchains are supported. See the <strong>CMakeLists.txt </strong>file for more information.</p>
+
+<p>Related GitHub repositories:</p>
+
+<ul>
+    <li><a href="https://github.com/endurodave/AsyncMulticastDelegateModern">Asynchronous Multicast Delegates in Modern C++</a> - by David Lafreniere</li>
+    <li><a href="https://github.com/endurodave/StateMachine">State Machine Design in C++</a> - by David Lafreniere</li>
+</ul>
 
 <h2>Asynchronous Delegate Callbacks</h2>
 
@@ -168,7 +175,7 @@ STATE_DEFINE(SelfTest, Failed, NoEventData)
 
 <h2>CentrifugeTest</h2>
 
-<p>The <code>CentrifugeTest </code>state machine diagram shown below implements the centrifuge self-test described in &quot;<a href="https://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus"><strong>State Machine Design in C++</strong></a>&quot;. <code>CentrifugeTest</code> uses&nbsp;state machine inheritance by inheriting the <code>Idle</code>, <code>Completed</code> and <code>Failed</code> states from the <code>SelfTest</code> class.&nbsp;The difference here is that the <code>Timer</code> class is used to provide <code>Poll </code>events via asynchronous delegate callbacks.</p>
+<p>The <code>CentrifugeTest </code>state machine diagram shown below implements the centrifuge self-test described in &quot;<a href="https://github.com/endurodave/StateMachine"><strong>State Machine Design in C++</strong></a>&quot;. <code>CentrifugeTest</code> uses&nbsp;state machine inheritance by inheriting the <code>Idle</code>, <code>Completed</code> and <code>Failed</code> states from the <code>SelfTest</code> class.&nbsp;The difference here is that the <code>Timer</code> class is used to provide <code>Poll </code>events via asynchronous delegate callbacks.</p>
 
 <p align="center"><img height="765" src="CentrifugeTest.png" width="520" /></p>
 
@@ -328,7 +335,7 @@ void SelfTestEngineCompleteCallback()
 
 <h2>Conclusion</h2>
 
-<p>The <code>StateMachine </code>and <code>Delegate&lt;&gt;</code> implementations can be used separately. Each is useful unto itself. However, combining the two offers a novel framework for multithreaded state-driven application development. The article has shown how to coordinate the behavior of state machines when multiple threads are used,&nbsp;which may not be entirely obvious when looking at simplistic, single threaded examples.</p>
+<p>The <code>StateMachine</code> and <code>Delegate&lt;&gt;</code> implementations can be used separately. Each is useful unto itself. However, combining the two offers a novel framework for multithreaded state-driven application development. The article has shown how to coordinate the behavior of state machines when multiple threads are used,&nbsp;which may not be entirely obvious when looking at simplistic, single threaded examples.</p>
 
 <p>I&rsquo;ve successfully used ideas similar to this on many different PC and embedded projects. The code is portable to any platform with a small amount of effort. I particularly like idea of asynchronous delegate callbacks because it effectively hides inter-thread communication and the organization of the state machines makes creating and maintaining self-tests easy.</p>
 
@@ -338,7 +345,7 @@ void SelfTestEngineCompleteCallback()
 	<li><a href="http://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus"><strong>State Machine Design in C++</strong></a> - by David Lafreniere</li>
     <li><a href="https://www.codeproject.com/Articles/5277036/Asynchronous-Multicast-Delegates-in-Modern-Cpluspl"><strong>Asynchronous Multicast Delegates in Modern C++</strong></a> - by David Lafreniere</li>
 	<li><a href="https://www.codeproject.com/Articles/1156423/Cplusplus-State-Machine-with-Threads"><strong>C++ State Machine with Threads</strong></a> &ndash; by David Lafreniere</li>
-	<li><a href="http://www.codeproject.com/Articles/1169105/Cplusplus-std-thread-Event-Loop-with-Message-Queue">C++ std::thread Event Loop with Message Queue and Timer</a> - by David Lafreniere</li>
+	<li><a href="http://www.codeproject.com/Articles/1169105/Cplusplus-std-thread-Event-Loop-with-Message-Queue"><strong>C++ std::thread Event Loop with Message Queue and Timer</strong></a> - by David Lafreniere</li>
 </ul>
 
 
