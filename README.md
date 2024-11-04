@@ -1,7 +1,25 @@
 # C++ State Machine with Modern Asynchronous Multicast Delegates
+
 A framework combining C++ state machines with asynchronous multicast delegates.
 
-<h2>Introduction</h2>
+# Table of Contents
+
+- [C++ State Machine with Modern Asynchronous Multicast Delegates](#c-state-machine-with-modern-asynchronous-multicast-delegates)
+- [Table of Contents](#table-of-contents)
+- [Introduction](#introduction)
+- [Asynchronous Delegate Callbacks](#asynchronous-delegate-callbacks)
+- [Self-Test Subsystem](#self-test-subsystem)
+  - [SelfTestEngine](#selftestengine)
+  - [CentrifugeTest](#centrifugetest)
+  - [Timer](#timer)
+- [Poll Events](#poll-events)
+- [User Interface](#user-interface)
+- [Run-Time](#run-time)
+- [Conclusion](#conclusion)
+- [References](#references)
+
+
+# Introduction
 
 <p>A software-based Finite State Machines (FSM) is an implementation method used to decompose a design into states and events. Simple embedded devices with no operating system employ single threading such that the state machines run on a single &ldquo;thread&rdquo;. More complex systems use multithreading to divvy up the processing.</p>
 
@@ -22,7 +40,7 @@ A framework combining C++ state machines with asynchronous multicast delegates.
     <li><a href="https://github.com/endurodave/StateMachine">State Machine Design in C++</a> - by David Lafreniere</li>
 </ul>
 
-<h2>Asynchronous Delegate Callbacks</h2>
+# Asynchronous Delegate Callbacks
 
 <p>If you&rsquo;re not familiar with a delegate, the concept is quite simple. A delegate can be thought of as a super function pointer. In C++, there&#39;s no pointer type capable of pointing to all the possible function variations: instance member, virtual, const, static, and free (global). A function pointer can&rsquo;t point to instance member functions, and pointers to member functions have all sorts of limitations. However, delegate classes can, in a type-safe way, point to any function provided the function signature matches. In short, a delegate points to any function with a matching signature to support anonymous function invocation.</p>
 
@@ -36,7 +54,7 @@ A framework combining C++ state machines with asynchronous multicast delegates.
 
 <p>The final location is within the <code>Timer</code> class, which fires periodic callbacks on a registered callback function. A generic, low-speed timer capable of calling a function on the client-specified thread is quite useful for event driven state machines where you might want to poll for some condition to occur. In this case, the <code>Timer</code> class is used to inject poll events into the state machine instances.</p>
 
-<h2>Self-Test Subsystem</h2>
+# Self-Test Subsystem
 
 <p>Self-tests execute a series of tests on hardware and mechanical systems to ensure correct operation. In this example, there are four state machine classes implementing our self-test subsystem as shown in the inheritance diagram below:</p>
 
@@ -44,7 +62,7 @@ A framework combining C++ state machines with asynchronous multicast delegates.
 
 <p align="center"><strong>Figure 1: Self-Test Subsystem Inheritance Diagram</strong></p>
 
-<h2>SelfTestEngine</h2>
+## SelfTestEngine
 
 <p><code>SelfTestEngine</code> is thread-safe and the main point of contact for client&rsquo;s utilizing the self-test subsystem. <code>CentrifugeTest </code>and <code>PressureTest </code>are members of SelfTestEngine. <code>SelfTestEngine </code>is responsible for sequencing the individual self-tests in the correct order as shown in the state diagram below. &nbsp;</p>
 
@@ -173,7 +191,7 @@ STATE_DEFINE(SelfTest, Failed, NoEventData)
 
 <p>One might ask why the state machines use asynchronous delegate callbacks. If the state machines are on the same thread, why not use a normal, synchronous callback instead? The problem to prevent is a callback into a currently executing state machine, that is, the call stack wrapping back around into the same class instance. For example, the following call sequence should be prevented: <code>SelfTestEngine </code>calls <code>CentrifugeTest </code>calls back <code>SelfTestEngine</code>. An asynchronous callback allows the stack to unwind and prevents this unwanted behavior.</p>
 
-<h2>CentrifugeTest</h2>
+## CentrifugeTest
 
 <p>The <code>CentrifugeTest </code>state machine diagram shown below implements the centrifuge self-test described in &quot;<a href="https://github.com/endurodave/StateMachine"><strong>State Machine Design in C++</strong></a>&quot;. <code>CentrifugeTest</code> uses&nbsp;state machine inheritance by inheriting the <code>Idle</code>, <code>Completed</code> and <code>Failed</code> states from the <code>SelfTest</code> class.&nbsp;The difference here is that the <code>Timer</code> class is used to provide <code>Poll </code>events via asynchronous delegate callbacks.</p>
 
@@ -181,7 +199,7 @@ STATE_DEFINE(SelfTest, Failed, NoEventData)
 
 <p align="center"><strong>Figure 3: CentrifugeTest State Machine</strong></p>
 
-<h2>Timer</h2>
+## Timer
 
 <p>The <code>Timer </code>class provides a common mechanism to receive function callbacks by registering with <code>Expired</code>. <code>Start()</code> starts the callbacks at a particular interval. <code>Stop()</code> stops the callbacks.</p>
 
@@ -215,7 +233,7 @@ public:
             Timer::ProcessTimers();
             break;</pre>
 
-<h2>Poll Events</h2>
+# Poll Events
 
 <p><code>CentrifugeTest </code>has a <code>Timer<strong> </strong></code>instance and registers for callbacks. The callback function, a thread instance and a this pointer is provided to <code>Register()</code> facilitating the asynchronous callback mechanism.</p>
 
@@ -249,7 +267,7 @@ STATE_DEFINE(CentrifugeTest, Acceleration, NoEventData)
 }
 </pre>
 
-<h2>User Interface</h2>
+# User Interface
 
 <p>The project doesn&rsquo;t have a user interface except the text console output. For this example, the &ldquo;user interface&rdquo; just outputs self-test status messages on the user interface thread via the <code>SelfTestEngineStatusCallback()</code> function:</p>
 
@@ -270,7 +288,7 @@ SelfTestEngine::StatusCallback +=
 
 <p>The user interface thread here is just used to simulate callbacks to a GUI library normally running in a separate thread of control.</p>
 
-<h2>Run-Time</h2>
+# Run-Time
 
 <p>The program&rsquo;s <code>main()</code> function is shown below. It creates the two threads, registers for callbacks from <code>SelfTestEngine</code>, then calls <code>Start()</code> to start the self-tests.</p>
 
@@ -333,13 +351,13 @@ void SelfTestEngineCompleteCallback()
 
 <p align="center"><strong>Figure 4: Console Output</strong></p>
 
-<h2>Conclusion</h2>
+# Conclusion
 
 <p>The <code>StateMachine</code> and <code>Delegate&lt;&gt;</code> implementations can be used separately. Each is useful unto itself. However, combining the two offers a novel framework for multithreaded state-driven application development. The article has shown how to coordinate the behavior of state machines when multiple threads are used,&nbsp;which may not be entirely obvious when looking at simplistic, single threaded examples.</p>
 
 <p>I&rsquo;ve successfully used ideas similar to this on many different PC and embedded projects. The code is portable to any platform with a small amount of effort. I particularly like idea of asynchronous delegate callbacks because it effectively hides inter-thread communication and the organization of the state machines makes creating and maintaining self-tests easy.</p>
 
-<h2>References</h2>
+# References
 
 <ul>
 	<li><a href="http://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus"><strong>State Machine Design in C++</strong></a> - by David Lafreniere</li>
