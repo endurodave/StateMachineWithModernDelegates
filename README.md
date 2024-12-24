@@ -1,3 +1,8 @@
+![License MIT](https://img.shields.io/github/license/BehaviorTree/BehaviorTree.CPP?color=blue)
+[![conan Ubuntu](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_ubuntu.yml/badge.svg)](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_ubuntu.yml)
+[![conan Ubuntu](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_clang.yml/badge.svg)](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_clang.yml)
+[![conan Windows](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_windows.yml/badge.svg)](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_windows.yml)
+
 # C++ State Machine with Modern Asynchronous Multicast Delegates
 
 A framework combining C++ state machines with asynchronous multicast delegates.
@@ -36,7 +41,7 @@ A framework combining C++ state machines with asynchronous multicast delegates.
 <p>Related GitHub repositories:</p>
 
 <ul>
-    <li><a href="https://github.com/endurodave/AsyncMulticastDelegateModern">Asynchronous Multicast Delegates in Modern C++</a> - by David Lafreniere</li>
+    <li><a href="https://github.com/endurodave/cpp-async-delegate">Asynchronous Multicast Delegates in Modern C++</a> - by David Lafreniere</li>
     <li><a href="https://github.com/endurodave/StateMachine">State Machine Design in C++</a> - by David Lafreniere</li>
 </ul>
 
