@@ -2,7 +2,7 @@
 #define _DELEGATE_H
 
 // Delegate.h
-// @see https://github.com/endurodave/AsyncMulticastDelegateModern
+// @see https://github.com/endurodave/cpp-async-delegate
 // David Lafreniere, Aug 2020.
 
 /// @file
@@ -34,12 +34,12 @@ public:
     /// @brief Compares two delegate objects for equality.
     /// @param rhs The delegate object to compare with the current object.
     /// @return `true` if the objects are equal, `false` otherwise.
-    virtual bool operator==(const DelegateBase& rhs) const = 0;
+    bool operator==(const DelegateBase& rhs) const noexcept { return Equal(rhs); }
 
     /// @brief Compares two delegate objects for inequality.
     /// @param rhs The delegate object to compare with the current object.
     /// @return `true` if the objects are not equal, `false` otherwise.
-    virtual bool operator!=(const DelegateBase& rhs) const { return !(*this == rhs); }
+    bool operator!=(const DelegateBase& rhs) const { return !Equal(rhs); }
 
     /// Overload operator== to compare the delegate to nullptr
     /// @return `true` if delegate is null.
@@ -48,6 +48,10 @@ public:
     /// Overload operator!= to compare the delegate to nullptr
     /// @return `true` if delegate is not null.
     virtual bool operator!=(std::nullptr_t) const noexcept = 0;
+
+    /// Compares two delegate objects for equality.
+    /// @return `true` if the objects are equal, `false` otherwise.
+    virtual bool Equal(const DelegateBase& other) const = 0;
 
     /// @brief Clone a delegate instance.
     /// @details Use Clone() to provide a deep copy using a base pointer. Covariant 
@@ -114,6 +118,9 @@ public:
     /// @brief Default constructor creates an empty delegate.
     DelegateFree() = default;
 
+    /// @brief Destructor ensures empty when destroyed.
+    ~DelegateFree() { Clear(); }
+
     /// @brief Bind a free function to the delegate.
     /// @details This method associates a free function (`func`) with the delegate. 
     /// Once the function is bound, the delegate can be used to invoke the function.
@@ -135,7 +142,7 @@ public:
     /// @return A pointer to a new `ClassType` instance.
     /// @post The caller is responsible for deleting the clone object.
     virtual ClassType* Clone() const override { 
-        return new ClassType(*this); 
+        return new(std::nothrow) ClassType(*this); 
     }
 
     /// @brief Assigns the state of one object to another.
@@ -146,7 +153,7 @@ public:
         m_func = rhs.m_func; 
     }
 
-    /// @brief Invoke the bound delegate function synchronously. 
+    /// @brief Invoke the bound delegate function synchronously. Always safe to call.
     /// @param[in] args - the function arguments, if any.
     /// @return The bound function return value, if any. If empty delegate
     /// default return type returned. 
@@ -185,11 +192,15 @@ public:
     /// @brief Compares two delegate objects for equality.
     /// @param[in] rhs The `DelegateBase` object to compare with the current object.
     /// @return `true` if the two delegate objects are equal, `false` otherwise.
-    virtual bool operator==(const DelegateBase& rhs) const override {
+    virtual bool Equal(const DelegateBase& rhs) const override {
         auto derivedRhs = dynamic_cast<const ClassType*>(&rhs);
         return derivedRhs &&
             m_func == derivedRhs->m_func;
     }
+
+    /// Compares two delegate objects for equality.
+    /// @return `true` if the objects are equal, `false` otherwise.
+    bool operator==(const ClassType& rhs) const noexcept { return Equal(rhs); }
 
     /// Overload operator== to compare the delegate to nullptr
     /// @return `true` if delegate is null.
@@ -283,6 +294,9 @@ public:
     /// @brief Default constructor creates an empty delegate.
     DelegateMember() = default;
 
+    /// @brief Destructor ensures empty when destroyed.
+    ~DelegateMember() { Clear(); }
+
     /// @brief Bind a member function to the delegate.
     /// @details This method associates a member function (`func`) with the delegate. 
     /// Once the function is bound, the delegate can be used to invoke the function.
@@ -331,24 +345,13 @@ public:
         m_func = reinterpret_cast<MemberFunc>(func);
     }
 
-    /// Compares two ClassType objects using the '<' operator.
-    /// @param rhs The object to compare with.
-    /// @return `true` if the current object's value is less than the other object's value,
-    /// `false` otherwise.
-    /// @note Do not call! Not allowed since comparing member function 
-    /// pointers for operator< not allowed in C++.
-    bool operator<(const ClassType& rhs) const {
-        static_assert(false, "Cannot compare member function pointers");
-        return false;
-    }
-
     /// @brief Creates a copy of the current object.
     /// @details Clones the current instance of the class by creating a new object
     /// and copying the state of the current object to it. 
     /// @return A pointer to a new `ClassType` instance.
     /// @post The caller is responsible for deleting the clone object.
     virtual ClassType* Clone() const override {
-        return new ClassType(*this);
+        return new(std::nothrow) ClassType(*this);
     }
 
     /// @brief Assigns the state of one object to another.
@@ -360,7 +363,7 @@ public:
         m_func = rhs.m_func;
     }
 
-    /// @brief Invoke the bound delegate function synchronously. 
+    /// @brief Invoke the bound delegate function synchronously. Always safe to call.
     /// @param[in] args - the function arguments, if any.
     /// @return The bound function return value, if any. If empty delegate
     /// default return type returned. 
@@ -404,12 +407,16 @@ public:
     /// @brief Compares two delegate objects for equality.
     /// @param[in] rhs The `DelegateBase` object to compare with the current object.
     /// @return `true` if the two delegate objects are equal, `false` otherwise.
-    virtual bool operator==(const DelegateBase& rhs) const override {
+    virtual bool Equal(const DelegateBase& rhs) const override {
         auto derivedRhs = dynamic_cast<const ClassType*>(&rhs);
         return derivedRhs &&
             m_func == derivedRhs->m_func &&
             m_object == derivedRhs->m_object;
     }
+
+    /// Compares two delegate objects for equality.
+    /// @return `true` if the objects are equal, `false` otherwise.
+    bool operator==(const ClassType& rhs) const noexcept { return Equal(rhs); }
 
     /// Overload operator== to compare the delegate to nullptr
     /// @return `true` if delegate is null.
@@ -448,6 +455,14 @@ public:
     explicit operator bool() const noexcept { return !Empty(); }
 
 private:
+    /// Compares two ClassType objects using the '<' operator.
+    /// @param rhs The object to compare with.
+    /// @return `true` if the current object's value is less than the other object's value,
+    /// `false` otherwise.
+    /// @note Do not call! Not allowed since comparing member function 
+    /// pointers for operator< not allowed in C++.
+    bool operator<(const ClassType& rhs) const = delete; 
+
     /// Pointer to a class object, representing the bound target instance.
     SharedPtr m_object = nullptr;
 
@@ -474,7 +489,7 @@ class DelegateFunction; // Not defined
 /// 
 /// Depending on how usage, this may never be a issue but its worth noting. 
 /// 
-/// The other delegate class has no such limitations and works under all conditions,
+/// The other delegate classes has no such limitations and works under all conditions,
 /// including comparing two instance functions of the same class. 
 /// 
 /// @tparam RetType The return type of the bound delegate function.
@@ -503,13 +518,21 @@ public:
     /// @brief Default constructor creates an empty delegate.
     DelegateFunction() = default;
 
+    /// @brief Destructor ensures empty when destroyed.
+    ~DelegateFunction() { Clear(); }
+
     /// @brief Bind a member function to the delegate.
     /// @details This method associates a member function (`func`) with the delegate. 
     /// Once the function is bound, the delegate can be used to invoke the function.
     /// @param[in] func The `std::function` to bind to the delegate. This function must 
     /// match the signature of the delegate.
     void Bind(FunctionType func) {
-        m_func = func;
+        try {
+            m_func = func;
+        }
+        catch (const std::bad_alloc&) {
+            BAD_ALLOC();
+        }
     }
 
     /// Compares two ClassType objects using the '<' operator.
@@ -526,7 +549,7 @@ public:
     /// @return A pointer to a new `ClassType` instance.
     /// @post The caller is responsible for deleting the clone object.
     virtual ClassType* Clone() const override { 
-        return new ClassType(*this); 
+        return new(std::nothrow) ClassType(*this); 
     }
 
     /// @brief Assigns the state of one object to another.
@@ -537,7 +560,7 @@ public:
         m_func = rhs.m_func;
     }
 
-    /// @brief Invoke the bound delegate function synchronously. 
+    /// @brief Invoke the bound delegate function synchronously. Always safe to call.
     /// @param[in] args - the function arguments, if any.
     /// @return The bound function return value, if any. If empty delegate
     /// default return type returned. 
@@ -576,7 +599,7 @@ public:
     /// @brief Compares two delegate objects for equality.
     /// @param[in] rhs The `DelegateBase` object to compare with the current object.
     /// @return `true` if the two delegate objects are equal, `false` otherwise.
-    virtual bool operator==(const DelegateBase& rhs) const override {
+    virtual bool Equal(const DelegateBase& rhs) const override {
         auto derivedRhs = dynamic_cast<const ClassType*>(&rhs);
         if (derivedRhs) {
             // If both delegates are empty, they are equal
@@ -591,6 +614,10 @@ public:
 
         return false;  // Return false if dynamic cast failed
     }
+
+    /// Compares two delegate objects for equality.
+    /// @return `true` if the objects are equal, `false` otherwise.
+    bool operator==(const ClassType& rhs) const noexcept { return Equal(rhs); }
 
     /// Overload operator== to compare the delegate to nullptr
     /// @return `true` if delegate is null.

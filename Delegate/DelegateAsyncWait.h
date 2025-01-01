@@ -2,7 +2,7 @@
 #define _DELEGATE_ASYNC_WAIT_H
 
 // DelegateAsyncWait.h
-// @see https://github.com/endurodave/AsyncMulticastDelegateModern
+// @see https://github.com/endurodave/cpp-async-delegate
 // David Lafreniere, Aug 2020.
 
 /// @file
@@ -24,16 +24,14 @@
 /// threads using the two thread safe functions below:
 ///
 /// `RetType operator()(Args... args)` - called by the source thread to initiate the async
-/// function call. May throw `std::bad_alloc` if dynamic storage allocation fails. All
-/// other delegate class functions do not throw exceptions.
+/// function call. May throw `std::bad_alloc` if dynamic storage allocation fails. Clone()
+/// also may throw `std::bad_alloc`. All other delegate class functions do not throw exceptions.
 ///
 /// `void Invoke(std::shared_ptr<DelegateMsg> msg)` - called by the destination
 /// thread to invoke the target function. The destination thread must not call any other
 /// delegate instance functions.
 /// 
 /// Limitations:
-/// 
-/// * Cannot use a `void*` as a target function argument.
 /// 
 /// * Cannot use rvalue reference (T&&) as a target function argument.
 /// 
@@ -168,8 +166,11 @@ public:
     /// @param[in] func The free function to bind to the delegate. This function must 
     /// match the signature of the delegate.
     /// @param[in] thread The execution thread to invoke `func`.
-    void Bind(FreeFunc func, DelegateThread& thread) {
+    /// @param[in] timeout The calling thread timeout for destination thread to
+    /// invoke the target function. 
+    void Bind(FreeFunc func, DelegateThread& thread, std::chrono::milliseconds timeout = WAIT_INFINITE) {
         m_thread = &thread;
+        m_timeout = timeout;
         BaseType::Bind(func);
     }
 
@@ -192,8 +193,9 @@ public:
     /// and copying the state of the current object to it. 
     /// @return A pointer to a new `ClassType` instance.
     /// @post The caller is responsible for deleting the clone object.
+    /// @throws std::bad_alloc If dynamic memory allocation fails and USE_ASSERTS not defined.
     virtual ClassType* Clone() const override {
-        return new ClassType(*this);
+        return new(std::nothrow) ClassType(*this);
     }
 
     /// @brief Assignment operator that assigns the state of one object to another.
@@ -229,13 +231,17 @@ public:
     /// @brief Compares two delegate objects for equality.
     /// @param[in] rhs The `DelegateBase` object to compare with the current object.
     /// @return `true` if the two delegate objects are equal, `false` otherwise.
-    virtual bool operator==(const DelegateBase& rhs) const override {
+    virtual bool Equal(const DelegateBase& rhs) const override {
         auto derivedRhs = dynamic_cast<const ClassType*>(&rhs);
         return derivedRhs &&
             m_thread == derivedRhs->m_thread &&
             m_timeout == derivedRhs->m_timeout &&
-            BaseType::operator==(rhs);
+            BaseType::Equal(rhs);
     }
+
+    /// Compares two delegate objects for equality.
+    /// @return `true` if the objects are equal, `false` otherwise.
+    bool operator==(const ClassType& rhs) const noexcept { return Equal(rhs); }
 
     /// Overload operator== to compare the delegate to nullptr
     /// @return `true` if delegate is null.
@@ -266,7 +272,7 @@ public:
     /// @details Invoke delegate function asynchronously and wait for the return value.
     /// This function is called by the source thread. Dispatches the delegate data into the 
     /// destination thread message queue. `Invoke()` must be called by the destination 
-    /// thread to invoke the target function.
+    /// thread to invoke the target function. Always safe to call.
     /// 
     /// If the destination thread invokes the function within `m_timeout`, the return 
     /// value is obtained from the destination thread function call. If `m_timeout` expires 
@@ -294,12 +300,12 @@ public:
             // Create a clone instance of this delegate 
             auto delegate = std::shared_ptr<ClassType>(Clone());
             if (!delegate)
-                throw std::bad_alloc();
+                BAD_ALLOC();
 
             // Create a new message instance for sending to the destination thread.
             auto msg = std::make_shared<DelegateAsyncWaitMsg<Args...>>(delegate, std::forward<Args>(args)...);
             if (!msg)
-                throw std::bad_alloc();
+                BAD_ALLOC();
             msg->SetInvokerWaiting(true);
 
             auto thread = this->GetThread();
@@ -334,7 +340,7 @@ public:
     }
 
     /// @brief Invoke delegate function asynchronously and block for function return value.
-    /// Called by the source thread.
+    /// Called by the source thread. Always safe to call.
     /// @param[in] args The function arguments, if any.
     /// @return The bound function return value stored withing `std::optional`. Use  
     /// `has_value()` to check if the the return value is valid. `value()` contains 
@@ -360,7 +366,7 @@ public:
     /// target function, the target function is not called.
     /// @param[in] msg The delegate message created and sent within `operator()(Args... args)`.
     /// @return `true` if target function invoked or timeout expired; `false` if error. 
-    virtual bool Invoke(std::shared_ptr<DelegateMsg> msg) {
+    virtual bool Invoke(std::shared_ptr<DelegateMsg> msg) override {
         static_assert(!(is_unique_ptr<RetType>::value), "std::unique_ptr return value not allowed");
 
         // Typecast the base pointer to back correct derived to instance
@@ -518,8 +524,11 @@ public:
     /// @param[in] func The function to bind to the delegate. This function must match 
     /// the signature of the delegate.
     /// @param[in] thread The execution thread to invoke `func`.
-    void Bind(SharedPtr object, MemberFunc func, DelegateThread& thread) {
+    /// @param[in] timeout The calling thread timeout for destination thread to
+    /// invoke the target function. 
+    void Bind(SharedPtr object, MemberFunc func, DelegateThread& thread, std::chrono::milliseconds timeout = WAIT_INFINITE) {
         m_thread = &thread;
+        m_timeout = timeout;
         BaseType::Bind(object, func);
     }
 
@@ -530,8 +539,11 @@ public:
     /// @param[in] func The member function to bind to the delegate. This function must 
     /// match the signature of the delegate.
     /// @param[in] thread The execution thread to invoke `func`.
-    void Bind(SharedPtr object, ConstMemberFunc func, DelegateThread& thread) {
+    /// @param[in] timeout The calling thread timeout for destination thread to
+    /// invoke the target function. 
+    void Bind(SharedPtr object, ConstMemberFunc func, DelegateThread& thread, std::chrono::milliseconds timeout = WAIT_INFINITE) {
         m_thread = &thread;
+        m_timeout = timeout;
         BaseType::Bind(object, func);
     }
 
@@ -542,8 +554,11 @@ public:
     /// @param[in] func The function to bind to the delegate. This function must match 
     /// the signature of the delegate.
     /// @param[in] thread The execution thread to invoke `func`.
-    void Bind(ObjectPtr object, MemberFunc func, DelegateThread& thread) {
+    /// @param[in] timeout The calling thread timeout for destination thread to
+    /// invoke the target function. 
+    void Bind(ObjectPtr object, MemberFunc func, DelegateThread& thread, std::chrono::milliseconds timeout = WAIT_INFINITE) {
         m_thread = &thread;
+        m_timeout = timeout;
         BaseType::Bind(object, func);
     }
 
@@ -554,8 +569,11 @@ public:
     /// @param[in] func The member function to bind to the delegate. This function must 
     /// match the signature of the delegate.
     /// @param[in] thread The execution thread to invoke `func`.
-    void Bind(ObjectPtr object, ConstMemberFunc func, DelegateThread& thread) {
+    /// @param[in] timeout The calling thread timeout for destination thread to
+    /// invoke the target function. 
+    void Bind(ObjectPtr object, ConstMemberFunc func, DelegateThread& thread, std::chrono::milliseconds timeout = WAIT_INFINITE) {
         m_thread = &thread;
+        m_timeout = timeout;
         BaseType::Bind(object, func);
     }
 
@@ -578,8 +596,9 @@ public:
     /// and copying the state of the current object to it. 
     /// @return A pointer to a new `ClassType` instance.
     /// @post The caller is responsible for deleting the clone object.
+    /// @throws std::bad_alloc If dynamic memory allocation fails and USE_ASSERTS not defined.
     virtual ClassType* Clone() const override {
-        return new ClassType(*this);
+        return new(std::nothrow) ClassType(*this);
     }
 
     /// @brief Assignment operator that assigns the state of one object to another.
@@ -615,13 +634,17 @@ public:
     /// @brief Compares two delegate objects for equality.
     /// @param[in] rhs The `DelegateBase` object to compare with the current object.
     /// @return `true` if the two delegate objects are equal, `false` otherwise.
-    virtual bool operator==(const DelegateBase& rhs) const override {
+    virtual bool Equal(const DelegateBase& rhs) const override {
         auto derivedRhs = dynamic_cast<const ClassType*>(&rhs);
         return derivedRhs &&
             m_thread == derivedRhs->m_thread &&
             m_timeout == derivedRhs->m_timeout &&
-            BaseType::operator==(rhs);
+            BaseType::Equal(rhs);
     }
+
+    /// Compares two delegate objects for equality.
+    /// @return `true` if the objects are equal, `false` otherwise.
+    bool operator==(const ClassType& rhs) const noexcept { return Equal(rhs); }
 
     /// Overload operator== to compare the delegate to nullptr
     /// @return `true` if delegate is null.
@@ -652,7 +675,7 @@ public:
     /// @details Invoke delegate function asynchronously and wait for the return value.
     /// This function is called by the source thread. Dispatches the delegate data into the 
     /// destination thread message queue. `Invoke()` must be called by the destination 
-    /// thread to invoke the target function.
+    /// thread to invoke the target function. Always safe to call.
     /// 
     /// If the destination thread invokes the function within `m_timeout`, the return 
     /// value is obtained from the destination thread function call. If `m_timeout` expires 
@@ -680,12 +703,12 @@ public:
             // Create a clone instance of this delegate 
             auto delegate = std::shared_ptr<ClassType>(Clone());
             if (!delegate)
-                throw std::bad_alloc();
+                BAD_ALLOC();
 
             // Create a new message instance for sending to the destination thread.
             auto msg = std::make_shared<DelegateAsyncWaitMsg<Args...>>(delegate, std::forward<Args>(args)...);
             if (!msg)
-                throw std::bad_alloc();
+                BAD_ALLOC();
             msg->SetInvokerWaiting(true);
 
             auto thread = this->GetThread();
@@ -720,7 +743,7 @@ public:
     }
 
     /// @brief Invoke delegate function asynchronously and block for function return value.
-    /// Called by the source thread.
+    /// Called by the source thread. Always safe to call.
     /// @param[in] args The function arguments, if any.
     /// @return The bound function return value stored withing `std::optional`. Use  
     /// `has_value()` to check if the the return value is valid. `value()` contains 
@@ -746,7 +769,7 @@ public:
     /// target function, the target function is not called.
     /// @param[in] msg The delegate message created and sent within `operator()(Args... args)`.
     /// @return `true` if target function invoked or timeout expired; `false` if error. 
-    virtual bool Invoke(std::shared_ptr<DelegateMsg> msg) {
+    virtual bool Invoke(std::shared_ptr<DelegateMsg> msg) override {
         static_assert(!(is_unique_ptr<RetType>::value), "std::unique_ptr return value not allowed");
 
         // Typecast the base pointer to back correct derived to instance
@@ -868,8 +891,11 @@ public:
     /// @param[in] func The `std::function` to bind to the delegate. This function must match 
     /// the signature of the delegate.
     /// @param[in] thread The execution thread to invoke `func`.
-    void Bind(FunctionType func, DelegateThread& thread) {
+    /// @param[in] timeout The calling thread timeout for destination thread to
+    /// invoke the target function. 
+    void Bind(FunctionType func, DelegateThread& thread, std::chrono::milliseconds timeout = WAIT_INFINITE) {
         m_thread = &thread;
+        m_timeout = timeout;
         BaseType::Bind(func);
     }
 
@@ -892,8 +918,9 @@ public:
     /// and copying the state of the current object to it. 
     /// @return A pointer to a new `ClassType` instance.
     /// @post The caller is responsible for deleting the clone object.
+    /// @throws std::bad_alloc If dynamic memory allocation fails and USE_ASSERTS not defined.
     virtual ClassType* Clone() const override {
-        return new ClassType(*this);
+        return new(std::nothrow) ClassType(*this);
     }
 
     /// @brief Assignment operator that assigns the state of one object to another.
@@ -929,13 +956,17 @@ public:
     /// @brief Compares two delegate objects for equality.
     /// @param[in] rhs The `DelegateBase` object to compare with the current object.
     /// @return `true` if the two delegate objects are equal, `false` otherwise.
-    virtual bool operator==(const DelegateBase& rhs) const override {
+    virtual bool Equal(const DelegateBase& rhs) const override {
         auto derivedRhs = dynamic_cast<const ClassType*>(&rhs);
         return derivedRhs &&
             m_thread == derivedRhs->m_thread &&
             m_timeout == derivedRhs->m_timeout &&
-            BaseType::operator==(rhs);
+            BaseType::Equal(rhs);
     }
+
+    /// Compares two delegate objects for equality.
+    /// @return `true` if the objects are equal, `false` otherwise.
+    bool operator==(const ClassType& rhs) const noexcept { return Equal(rhs); }
 
     /// Overload operator== to compare the delegate to nullptr
     /// @return `true` if delegate is null.
@@ -966,7 +997,7 @@ public:
     /// @details Invoke delegate function asynchronously and wait for the return value.
     /// This function is called by the source thread. Dispatches the delegate data into the 
     /// destination thread message queue. `Invoke()` must be called by the destination 
-    /// thread to invoke the target function.
+    /// thread to invoke the target function. Always safe to call.
     /// 
     /// If the destination thread invokes the function within `m_timeout`, the return 
     /// value is obtained from the destination thread function call. If `m_timeout` expires 
@@ -994,12 +1025,12 @@ public:
             // Create a clone instance of this delegate 
             auto delegate = std::shared_ptr<ClassType>(Clone());
             if (!delegate)
-                throw std::bad_alloc();
+                BAD_ALLOC();
 
             // Create a new message instance for sending to the destination thread.
             auto msg = std::make_shared<DelegateAsyncWaitMsg<Args...>>(delegate, std::forward<Args>(args)...);
             if (!msg)
-                throw std::bad_alloc();
+                BAD_ALLOC();
             msg->SetInvokerWaiting(true);
 
             auto thread = this->GetThread();
@@ -1034,7 +1065,7 @@ public:
     }
 
     /// @brief Invoke delegate function asynchronously and block for function return value.
-    /// Called by the source thread.
+    /// Called by the source thread. Always safe to call.
     /// @param[in] args The function arguments, if any.
     /// @return The bound function return value stored withing `std::optional`. Use  
     /// `has_value()` to check if the the return value is valid. `value()` contains 
@@ -1060,7 +1091,7 @@ public:
     /// target function, the target function is not called.
     /// @param[in] msg The delegate message created and sent within `operator()(Args... args)`.
     /// @return `true` if target function invoked or timeout expired; `false` if error. 
-    virtual bool Invoke(std::shared_ptr<DelegateMsg> msg) {
+    virtual bool Invoke(std::shared_ptr<DelegateMsg> msg) override {
         static_assert(!(is_unique_ptr<RetType>::value), "std::unique_ptr return value not allowed");
 
         // Typecast the base pointer to back correct derived to instance

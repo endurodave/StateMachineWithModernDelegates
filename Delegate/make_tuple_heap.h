@@ -1,7 +1,7 @@
 #ifndef _MAKE_TUPLE_HEAP_H
 #define _MAKE_TUPLE_HEAP_H
 
-// @see https://github.com/endurodave/AsyncMulticastDelegateModern
+// @see https://github.com/endurodave/cpp-async-delegate
 // David Lafreniere, Aug 2020.
 
 /// @file
@@ -14,7 +14,7 @@
 /// pointer, pointer-to-pointer, and reference.
 /// 
 /// The destination thread uses `std::apply()` to invoke the target function using
-/// the tuple of arguments. See `DelegateInvoke()` and `DelegateAsyncMsg()` in the
+/// the tuple of arguments. See `Invoke()` and `DelegateAsyncMsg()` in the
 /// file `DelegateAsync.h` for example usage.
 
 #include <tuple>
@@ -69,9 +69,8 @@ class heap_arg_deleter : public heap_arg_deleter_base
 {
 public:
     heap_arg_deleter(T& arg) : m_arg(arg) { }
-    virtual ~heap_arg_deleter()
-    {
-        delete &m_arg;
+    virtual ~heap_arg_deleter() { 
+        delete &m_arg; 
     }
 private:
     T& m_arg;
@@ -83,9 +82,8 @@ class heap_arg_deleter<T*> : public heap_arg_deleter_base
 {
 public:
     heap_arg_deleter(T* arg) : m_arg(arg) { }
-    virtual ~heap_arg_deleter()
-    {
-        delete m_arg;
+    virtual ~heap_arg_deleter() { 
+        delete m_arg; 
     }
 private:
     T* m_arg;
@@ -97,8 +95,7 @@ class heap_arg_deleter<T**> : public heap_arg_deleter_base
 {
 public:
     heap_arg_deleter(T** arg) : m_arg(arg) {}
-    virtual ~heap_arg_deleter()
-    {
+    virtual ~heap_arg_deleter() {
         delete *m_arg;
         delete m_arg;
     }
@@ -111,32 +108,38 @@ template <typename Arg, typename... TupleElem>
 auto tuple_append(xlist<std::shared_ptr<heap_arg_deleter_base>>& heapArgs, const std::tuple<TupleElem...> &tup, Arg** arg)
 {
     Arg** heap_arg = nullptr;
-    try 
-    {
-        // Check if arg is nullptr or *arg is nullptr
-        if (arg != nullptr && *arg != nullptr) {
-            // Allocate memory for heap_arg and copy the value
-            heap_arg = new Arg * ();
-            *heap_arg = new Arg(**arg);
-        }
-        else {
-            // If arg is nullptr or *arg is nullptr, create heap_arg as nullptr
-            heap_arg = new Arg * (nullptr);
-        }
 
-        std::shared_ptr<heap_arg_deleter_base> deleter(new heap_arg_deleter<Arg**>(heap_arg));
-        heapArgs.push_back(deleter);
-
-        return std::tuple_cat(tup, std::make_tuple(heap_arg));
+    // Check if arg is nullptr or *arg is nullptr
+    if (arg != nullptr && *arg != nullptr) {
+        // Allocate memory for heap_arg and copy the value
+        heap_arg = new(std::nothrow) Arg * ();
+        if (!heap_arg) {
+            BAD_ALLOC();
+        }
+            
+        *heap_arg = new(std::nothrow) Arg(**arg);
+        if (!*heap_arg) {
+            delete heap_arg;
+            BAD_ALLOC();
+        }
     }
-    catch (std::bad_alloc&)
-    {
-        if (heap_arg && *heap_arg) {
-            delete* heap_arg; // Delete the Arg* pointed to by heap_arg
+    else {
+        // If arg is nullptr or *arg is nullptr, create heap_arg as nullptr
+        heap_arg = new(std::nothrow) Arg * (nullptr);
+        if (!heap_arg) {
+            BAD_ALLOC();
         }
-        if (heap_arg) {
-            delete heap_arg; // Delete the heap_arg itself (which is a Arg**)
-        }
+    }
+    std::shared_ptr<heap_arg_deleter_base> deleter(new(std::nothrow) heap_arg_deleter<Arg**>(heap_arg));
+    if (!deleter) {
+        BAD_ALLOC();
+    }
+    try {
+        heapArgs.push_back(deleter);
+        return std::tuple_cat(tup, std::make_tuple(heap_arg));
+    } 
+    catch (const std::bad_alloc&) {
+        BAD_ALLOC();
         throw;
     }
 }
@@ -147,25 +150,48 @@ auto tuple_append(xlist<std::shared_ptr<heap_arg_deleter_base>>& heapArgs, const
 {
     Arg* heap_arg = nullptr;
     if (arg != nullptr) {
-        heap_arg = new Arg(*arg);  // Only create a new Arg if arg is not nullptr
+        heap_arg = new(std::nothrow) Arg(*arg);  // Only create a new Arg if arg is not nullptr
+        if (!heap_arg) {
+            BAD_ALLOC();
+        }
     }
-    std::shared_ptr<heap_arg_deleter_base> deleter(new heap_arg_deleter<Arg*>(heap_arg));
-    heapArgs.push_back(deleter);
-
-    return std::tuple_cat(tup, std::make_tuple(heap_arg));
+    std::shared_ptr<heap_arg_deleter_base> deleter(new(std::nothrow) heap_arg_deleter<Arg*>(heap_arg));
+    if (!deleter) {
+        BAD_ALLOC();
+    }
+    try {
+        heapArgs.push_back(deleter);
+        return std::tuple_cat(tup, std::make_tuple(heap_arg));
+    }
+    catch (const std::bad_alloc&) {
+        BAD_ALLOC();
+        throw;
+    }
 }
 
 /// @brief Append a reference argument to the tuple
 template <typename Arg, typename... TupleElem>
 auto tuple_append(xlist<std::shared_ptr<heap_arg_deleter_base>>& heapArgs, const std::tuple<TupleElem...> &tup, Arg& arg)
 {
-    Arg* heap_arg = new Arg(arg);
-    std::shared_ptr<heap_arg_deleter_base> deleter(new heap_arg_deleter<Arg*>(heap_arg));
-    heapArgs.push_back(deleter);
+    Arg* heap_arg = new(std::nothrow) Arg(arg);
+    if (!heap_arg) {
+        BAD_ALLOC();
+    }
+    std::shared_ptr<heap_arg_deleter_base> deleter(new(std::nothrow) heap_arg_deleter<Arg*>(heap_arg));
+    if (!deleter) {
+        BAD_ALLOC();
+    }
+    try {
+        heapArgs.push_back(deleter);
 
-    auto temp = std::make_tuple(std::forward_as_tuple(*heap_arg));  // Dereference heap_arg when creating tuple element
-    auto new_type = std::get<0>(temp);
-    return std::tuple_cat(tup, new_type);
+        auto temp = std::make_tuple(std::forward_as_tuple(*heap_arg));  // Dereference heap_arg when creating tuple element
+        auto new_type = std::get<0>(temp);
+        return std::tuple_cat(tup, new_type);
+    }
+    catch (const std::bad_alloc&) {
+        BAD_ALLOC();
+        throw;
+    }
 }
 
 /// @brief Terminate the template metaprogramming argument loop. This function is 
@@ -195,7 +221,7 @@ auto make_tuple_heap(xlist<std::shared_ptr<heap_arg_deleter_base>>& heapArgs, st
 /// @param args The remaining arguments to append to the tuple.
 /// @return A new tuple with all arguments appended.
 /// @throws std::bad_alloc If dynamic allocation of arguments created on the heap
-/// for appending to the tuple fails.
+/// for appending to the tuple fails and USE_ASSERTS not defined.
 template<typename Arg1, typename... Args, typename... Ts>
 auto make_tuple_heap(xlist<std::shared_ptr<heap_arg_deleter_base>>& heapArgs, std::tuple<Ts...> tup, Arg1 arg1, Args... args)
 {
