@@ -12,10 +12,13 @@
 /// sending a clone of the object to the destination thread message queue. The destination 
 /// thread calls `Invoke()` to invoke the target function.
 /// 
+/// Argument data is created on the heap using `operator new` for transport thought a thread 
+/// message queue. An optional fixed-block allocator is available. See `USE_ALLOCATOR`. 
+/// 
 /// `RetType operator()(Args... args)` - called by the source thread to initiate the async
-/// function call. May throw `std::bad_alloc` if dynamic storage allocation fails and USE_ASSERTS 
-/// is not defined. Clone() may also throw `std::bad_alloc`. All other delegate class functions do 
-/// not throw exceptions.
+/// function call. May throw `std::bad_alloc` if dynamic storage allocation fails and `USE_ASSERTS` 
+/// is not defined. Clone() may also throw `std::bad_alloc` unless `USE_ASSERTS`. All other delegate 
+/// class functions do not throw exceptions.
 ///
 /// `void Invoke(std::shared_ptr<DelegateMsg> msg)` - called by the destination
 /// thread to invoke the target function. The destination thread must not call any other
@@ -48,6 +51,22 @@
 #include <tuple>
 
 namespace DelegateLib {
+
+// Helper trait to check if a type is a reference to a std::shared_ptr
+template <typename T>
+struct is_shared_ptr_reference : std::false_type {};
+
+template <typename T>
+struct is_shared_ptr_reference<std::shared_ptr<T>&> : std::true_type {};
+
+template <typename T>
+struct is_shared_ptr_reference<std::shared_ptr<T>*> : std::true_type {};
+
+template <typename T>
+struct is_shared_ptr_reference<const std::shared_ptr<T>&> : std::true_type {};
+
+template <typename T>
+struct is_shared_ptr_reference<const std::shared_ptr<T>* > : std::true_type {};
 
 /// @brief Stores all function arguments suitable for non-blocking asynchronous calls.
 /// Argument data is stored in the heap.
@@ -265,8 +284,8 @@ public:
             // undefined. In other words:
             // void MyFunc(std::shared_ptr<T> data)		// Ok!
             // void MyFunc(std::shared_ptr<T>& data)	// Error if DelegateAsync or DelegateSpAsync target!
-            static_assert(!(std::disjunction_v<is_shared_ptr<Args>...> &&
-                (std::disjunction_v<std::is_lvalue_reference<Args>, std::is_pointer<Args>> || ...)),
+            static_assert(!(
+                std::disjunction_v<is_shared_ptr_reference<Args>...>),
                 "std::shared_ptr reference argument not allowed");
         }
     }
@@ -565,8 +584,8 @@ public:
             // undefined. In other words:
             // void MyFunc(std::shared_ptr<T> data)		// Ok!
             // void MyFunc(std::shared_ptr<T>& data)	// Error if DelegateAsync or DelegateSpAsync target!
-            static_assert(!(std::disjunction_v<is_shared_ptr<Args>...> &&
-                (std::disjunction_v<std::is_lvalue_reference<Args>, std::is_pointer<Args>> || ...)),
+            static_assert(!(
+                std::disjunction_v<is_shared_ptr_reference<Args>...>),
                 "std::shared_ptr reference argument not allowed");
         }
     }
@@ -806,8 +825,8 @@ public:
             // undefined. In other words:
             // void MyFunc(std::shared_ptr<T> data)		// Ok!
             // void MyFunc(std::shared_ptr<T>& data)	// Error if DelegateAsync or DelegateSpAsync target!
-            static_assert(!(std::disjunction_v<is_shared_ptr<Args>...> &&
-                (std::disjunction_v<std::is_lvalue_reference<Args>, std::is_pointer<Args>> || ...)),
+            static_assert(!(
+                std::disjunction_v<is_shared_ptr_reference<Args>...>),
                 "std::shared_ptr reference argument not allowed");
         }
     }

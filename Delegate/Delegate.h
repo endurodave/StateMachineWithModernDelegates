@@ -9,7 +9,7 @@
 /// @brief Delegate series of classes are used to invoke a function synchronously. 
 /// @details Delgates support binding to free functions, class instance functions, class 
 /// static function, and std::function targets. Lambda functions can be bound to a delegate 
-/// when assigned to a `std::function`. The classes are not thread safe.
+/// when assigned to a `std::function`. The classes are not thread-safe.
 /// 
 /// Limitations:
 /// 
@@ -23,6 +23,7 @@
 #include <memory>
 #include "DelegateOpt.h"
 
+/// The delegate library namespace
 namespace DelegateLib {
 
 /// @brief Non-template base class for all delegates.
