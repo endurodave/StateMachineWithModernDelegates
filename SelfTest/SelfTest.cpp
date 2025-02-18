@@ -1,5 +1,6 @@
 #include "SelfTest.h"
 #include "SelfTestEngine.h"
+#include "DelegateMQ.h"
 
 //------------------------------------------------------------------------------
 // SelfTest

@@ -3,13 +3,13 @@
 [![conan Ubuntu](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_clang.yml/badge.svg)](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_clang.yml)
 [![conan Windows](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_windows.yml/badge.svg)](https://github.com/endurodave/StateMachineWithModernDelegates/actions/workflows/cmake_windows.yml)
 
-# C++ State Machine with Modern Asynchronous Multicast Delegates
+# C++ State Machine with Asynchronous Delegates
 
-A framework combining C++ state machines with asynchronous multicast delegates.
+A framework combining [C++ State Machine](https://github.com/endurodave/StateMachine) with the [DelegateMQ](https://github.com/endurodave/DelegateMQ) asynchronous delegate library.
 
 # Table of Contents
 
-- [C++ State Machine with Modern Asynchronous Multicast Delegates](#c-state-machine-with-modern-asynchronous-multicast-delegates)
+- [C++ State Machine with Asynchronous Delegates](#c-state-machine-with-asynchronous-delegates)
 - [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
 - [Asynchronous Delegate Callbacks](#asynchronous-delegate-callbacks)
@@ -28,21 +28,15 @@ A framework combining C++ state machines with asynchronous multicast delegates.
 
 <p>A software-based Finite State Machines (FSM) is an implementation method used to decompose a design into states and events. Simple embedded devices with no operating system employ single threading such that the state machines run on a single &ldquo;thread&rdquo;. More complex systems use multithreading to divvy up the processing.</p>
 
-<p>Many FSM implementations exist including one I wrote about here on Code Project entitled &ldquo;<a href="http://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus"><strong>State Machine Design in C++</strong></a>&rdquo;. The article covers how to create C++ state machines using the <code>StateMachine</code> base class. What is missing, however, is how to integrate multiple state machines into the context of a multithreaded environment.</p>
-
-<p>&ldquo;<a href="https://www.codeproject.com/Articles/5277036/Asynchronous-Multicast-Delegates-in-Modern-Cpluspl"><strong>Asynchronous Multicast Delegates in Modern C++</strong></a>&rdquo; is another article I wrote on Code Project. This design provides a C++ delegate library that is capable of synchronous and asynchronous invocations on any callable function.</p>
-
-<p>This article combines the two previously described techniques, state machines and asynchronous multicast delegates, into a single project. In the previous articles, it may not be readily apparent using simple examples how multiple state machines coordinate activities and dispatch events to each other. The goal for the article is to provide a complete working project with threads, timers, events, and state machines all working together. To illustrate the concept, the example project implements a state-based self-test engine utilizing asynchronous communication between threads.</p>
-
-<p>I won&rsquo;t be re-explaining the <code>StateMachine</code> and <code>Delegate&lt;&gt;</code> implementations as the prior articles do that already. The primary focus is on how to combine the state machine and delegates into a single framework.</p>
+<p>This repository combines state machines and asynchronous delegates into a single project. The goal for the article is to provide a complete working project with threads, timers, events, and state machines all working together. To illustrate the concept, the example project implements a state-based self-test engine utilizing asynchronous communication between threads.</p>
 
 <p><a href="https://www.cmake.org/">CMake</a>&nbsp;is used to create the build files. CMake is free and open-source software. Windows, Linux and other toolchains are supported. See the <strong>CMakeLists.txt </strong>file for more information.</p>
 
 <p>Related GitHub repositories:</p>
 
 <ul>
-    <li><a href="https://github.com/endurodave/cpp-async-delegate">Asynchronous Multicast Delegates in Modern C++</a> - by David Lafreniere</li>
-    <li><a href="https://github.com/endurodave/StateMachine">State Machine Design in C++</a> - by David Lafreniere</li>
+    <li><a href="https://github.com/endurodave/DelegateMQ">DelegateMQ in C++</a> - a header-only library enables function invocations on any callable, either synchronously, asynchronously, or on a remote endpoint</li>
+    <li><a href="https://github.com/endurodave/StateMachine">State Machine Design in C++</a> - a compact C++ state machine</li>
 </ul>
 
 # Asynchronous Delegate Callbacks
@@ -51,7 +45,7 @@ A framework combining C++ state machines with asynchronous multicast delegates.
 
 <p>Asynchronous delegates take the concept a bit further and permits anonymous invocation of any function on a client specified thread of control. The function and all arguments are safely called from a destination thread simplifying inter-thread communication and eliminating cross-threading errors.&nbsp;</p>
 
-<p>The <code>Delegate&lt;&gt;</code> framework is used throughout to provide asynchronous callbacks making&nbsp;an effective publisher and subscriber mechanism. A publisher exposes a delegate container interface and one or more subscribers add delegate instances to the container to receive anonymous callbacks.&nbsp;</p>
+<p>The DelegateMQ library is used throughout to provide asynchronous callbacks making&nbsp;an effective publisher and subscriber mechanism. A publisher exposes a delegate container interface and one or more subscribers add delegate instances to the container to receive anonymous callbacks.&nbsp;</p>
 
 <p>The first place it&#39;s used is within the <code>SelfTest</code> class where the <code>SelfTest::CompletedCallback</code>&nbsp;delegate container allows subscribers to add delegates. Whenever a self-test completes a <code>SelfTest::CompletedCallback</code> callback is invoked notifying&nbsp;registered clients. <code>SelfTestEngine</code> registers with both&nbsp;<code>CentrifugeTest</code> and <code>PressureTest</code> to get asynchronously informed when the test is complete.</p>
 
@@ -81,7 +75,7 @@ A framework combining C++ state machines with asynchronous multicast delegates.
 void SelfTestEngine::Start(const StartData* data)
 {
     // Is the caller executing on m_thread?
-    if (m_thread.GetThreadId() != WorkerThread::GetCurrentThreadId())
+    if (m_thread.GetThreadId() != Thread::GetCurrentThreadId())
     {
         // Create an asynchronous delegate and reinvoke the function call on m_thread
         auto delegate = MakeDelegate(this, &amp;SelfTestEngine::Start, m_thread);
@@ -102,7 +96,7 @@ void SelfTestEngine::Start(const StartData* data)
 
 <p>The <code>SelfTest </code>base class provides three states common to all <code>SelfTest</code>-derived state machines: <code>Idle</code>, <code>Completed</code>, and <code>Failed</code>. <code>SelfTestEngine </code>then adds two more states: <code>StartCentrifugeTest </code>and <code>StartPressureTest</code>.</p>
 
-<p><code>SelfTestEngine </code>has one public event function, <code>Start()</code>, that starts the self-tests. <code>SelfTestEngine::StatusCallback</code> is an asynchronous callback allowing client&rsquo;s to register for status updates during testing. A <code>WorkerThread </code>instance is also contained within the class. All self-test state machine execution occurs on this thread.</p>
+<p><code>SelfTestEngine </code>has one public event function, <code>Start()</code>, that starts the self-tests. <code>SelfTestEngine::StatusCallback</code> is an asynchronous callback allowing client&rsquo;s to register for status updates during testing. A <code>Thread </code>instance is also contained within the class. All self-test state machine execution occurs on this thread.</p>
 
 <pre lang="c++">
 class SelfTestEngine : public SelfTest
@@ -117,7 +111,7 @@ public:
     // Start the self-tests. This is a thread-safe asycnhronous function. 
     void Start(const StartData* data);
 
-    WorkerThread&amp; GetThread() { return m_thread; }
+    Thread&amp; GetThread() { return m_thread; }
     static void InvokeStatusCallback(std::string msg);
 
 private:
@@ -129,7 +123,7 @@ private:
     PressureTest m_pressureTest;
 
     // Worker thread used by all self-tests
-    WorkerThread m_thread;
+    Thread m_thread;
 
     StartData m_startData;
 
@@ -231,7 +225,7 @@ public:
 	void Stop();
 ...</pre>
 
-<p>All <code>Timer </code>instances are stored in a private static list. The <code>WorkerThread::Process()</code> loop periodically services all the timers within the list by calling <code>Timer::ProcessTimers()</code>. Client&rsquo;s registered with <code>Expired </code>are invoked whenever the timer expires.</p>
+<p>All <code>Timer </code>instances are stored in a private static list. The <code>Thread::Process()</code> loop periodically services all the timers within the list by calling <code>Timer::ProcessTimers()</code>. Client&rsquo;s registered with <code>Expired </code>are invoked whenever the timer expires.</p>
 
 <pre lang="c++">
         case MSG_TIMER:
@@ -277,7 +271,7 @@ STATE_DEFINE(CentrifugeTest, Acceleration, NoEventData)
 <p>The project doesn&rsquo;t have a user interface except the text console output. For this example, the &ldquo;user interface&rdquo; just outputs self-test status messages on the user interface thread via the <code>SelfTestEngineStatusCallback()</code> function:</p>
 
 <pre lang="c++">
-WorkerThread userInterfaceThread(&quot;UserInterface&quot;);
+Thread userInterfaceThread(&quot;UserInterface&quot;);
 
 void SelfTestEngineStatusCallback(const SelfTestStatus&amp; status)
 {
@@ -365,10 +359,10 @@ void SelfTestEngineCompleteCallback()
 # References
 
 <ul>
-	<li><a href="http://www.codeproject.com/Articles/1087619/State-Machine-Design-in-Cplusplus"><strong>State Machine Design in C++</strong></a> - by David Lafreniere</li>
-    <li><a href="https://www.codeproject.com/Articles/5277036/Asynchronous-Multicast-Delegates-in-Modern-Cpluspl"><strong>Asynchronous Multicast Delegates in Modern C++</strong></a> - by David Lafreniere</li>
-	<li><a href="https://www.codeproject.com/Articles/1156423/Cplusplus-State-Machine-with-Threads"><strong>C++ State Machine with Threads</strong></a> &ndash; by David Lafreniere</li>
-	<li><a href="http://www.codeproject.com/Articles/1169105/Cplusplus-std-thread-Event-Loop-with-Message-Queue"><strong>C++ std::thread Event Loop with Message Queue and Timer</strong></a> - by David Lafreniere</li>
+	<li><a href="https://github.com/endurodave/StateMachine"><strong>State Machine Design in C++</strong></a> - by David Lafreniere</li>
+    <li><a href="https://github.com/endurodave/DelegateMQ"><strong>Asynchronous Multicast Delegates in Modern C++</strong></a> - by David Lafreniere</li>
+	<li><a href="https://github.com/endurodave/StateMachineWithThreads"><strong>C++ State Machine with Threads</strong></a> &ndash; by David Lafreniere</li>
+	<li><a href="https://github.com/endurodave/StdWorkerThread"><strong>C++ std::thread Event Loop with Message Queue and Timer</strong></a> - by David Lafreniere</li>
 </ul>
 
 

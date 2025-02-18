@@ -4,10 +4,7 @@
 #include "SelfTest.h"
 #include "CentrifugeTest.h"
 #include "PressureTest.h"
-#include "DelegateLib.h"
-#include "WorkerThreadStd.h"
-
-using namespace DelegateLib;
+#include "DelegateMQ.h"
 
 struct SelfTestStatus
 {
@@ -20,7 +17,7 @@ class SelfTestEngine : public SelfTest
 {
 public:
 	// Clients register for asynchronous self-test status callbacks
-	static MulticastDelegateSafe<void(const SelfTestStatus&)> StatusCallback;
+	static dmq::MulticastDelegateSafe<void(const SelfTestStatus&)> StatusCallback;
 
 	// Singleton instance of SelfTestEngine
 	static SelfTestEngine& GetInstance();
@@ -28,7 +25,7 @@ public:
 	// Start the self-tests. This is a thread-safe asycnhronous function. 
 	void Start(const StartData* data);
 
-	WorkerThread& GetThread() { return m_thread; }
+	Thread& GetThread() { return m_thread; }
 	static void InvokeStatusCallback(std::string msg);
 
 private:
@@ -40,7 +37,7 @@ private:
 	PressureTest m_pressureTest;
 
 	// Worker thread used by all self-tests
-	WorkerThread m_thread;
+	Thread m_thread;
 
 	StartData m_startData;
 

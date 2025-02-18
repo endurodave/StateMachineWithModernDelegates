@@ -14,29 +14,41 @@ cmake_minimum_required(VERSION 3.10)
 # Project name and language (C or C++)
 project(Delegate VERSION 1.0 LANGUAGES CXX)
 
+# Set build options
+set (DMQ_ALLOCATOR "OFF")
+set (DMQ_UTIL "ON")
+set (DMQ_THREAD "DMQ_THREAD_STDLIB")
+set (DMQ_SERIALIZE "DMQ_SERIALIZE_NONE")
+set (DMQ_TRANSPORT "DMQ_TRANSPORT_NONE")
+include("${CMAKE_SOURCE_DIR}/DelegateMQ/DelegateMQ.cmake")
+
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Collect all .cpp and *.h source files in the current directory
-file(GLOB SOURCES "${CMAKE_SOURCE_DIR}/*.cpp" "${CMAKE_SOURCE_DIR}/*.h")
+file(GLOB SOURCES "*.cpp" "*.h")
 
 # Collect all header files in the Delegate directory
-file(GLOB Delegate_HEADERS "${CMAKE_SOURCE_DIR}/Delegate/*.h")
+file(GLOB Delegate_HEADERS "${CMAKE_SOURCE_DIR}/DelegateMQ/delegate/*.h")
 
 # Organize Delegate headers into a "Delegate Files" folder in Visual Studio
-source_group("Delegate Files" FILES ${Delegate_HEADERS})
+source_group("Delegate Files" FILES ${DMQ_LIB_SOURCES})
 
 # Add subdirectories to include path
 include_directories( 
-    ${CMAKE_SOURCE_DIR}/Delegate
-    ${CMAKE_SOURCE_DIR}/SelfTest
-    ${CMAKE_SOURCE_DIR}/StateMachine
-    ${CMAKE_SOURCE_DIR}/Port
+    Delegate
+    SelfTest
+    StateMachine
+    Port
+    ${DMQ_INCLUDE_DIR}
 )
 
+# Collect DelegateMQ predef source files
+list(APPEND SOURCES ${DMQ_PREDEF_SOURCES})
+
 # Add an executable target
-add_executable(DelegateApp ${SOURCES} ${Delegate_HEADERS})
+add_executable(DelegateApp ${SOURCES} ${DMQ_LIB_SOURCES})
 
 # Define the DELEGATE_UNIT_TEST macro for the DelegateApp target
 if (ENABLE_UNIT_TESTS)

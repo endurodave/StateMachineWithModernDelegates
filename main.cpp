@@ -1,17 +1,27 @@
-#include "DelegateLib.h"
+#include "DelegateMQ.h"
 #include "SelfTestEngine.h"
 #include <iostream>
-#include "WorkerThreadStd.h"
 #include "DataTypes.h"
 
 // @see https://github.com/endurodave/StateMachineWithModernDelegates
 // David Lafreniere
 
 using namespace std;
-using namespace DelegateLib;
+using namespace dmq;
+
+std::atomic<bool> processTimerExit = false;
+static void ProcessTimers()
+{
+	while (!processTimerExit.load())
+	{
+		// Process all delegate-based timers
+		Timer::ProcessTimers();
+		std::this_thread::sleep_for(std::chrono::microseconds(50));
+	}
+}
 
 // A thread to capture self-test status callbacks for output to the "user interface"
-WorkerThread userInterfaceThread("UserInterface");
+Thread userInterfaceThread("UserInterface");
 
 // Simple flag to exit main loop
 BOOL selfTestEngineCompleted = FALSE;
@@ -38,6 +48,9 @@ void SelfTestEngineCompleteCallback()
 //------------------------------------------------------------------------------
 int main(void)
 {	
+	// Start the thread that will run ProcessTimers
+	std::thread timerThread(ProcessTimers);
+
 	// Create the worker threads
 	userInterfaceThread.CreateThread();
 	SelfTestEngine::GetInstance().GetThread().CreateThread();
@@ -67,6 +80,11 @@ int main(void)
 	// Exit the worker threads
 	userInterfaceThread.ExitThread();
 	SelfTestEngine::GetInstance().GetThread().ExitThread();
+
+	// Ensure the timer thread completes before main exits
+	processTimerExit.store(true);
+	if (timerThread.joinable())
+		timerThread.join();
 
 	return 0;
 }

@@ -2,9 +2,7 @@
 #define _SELF_TEST_H
 
 #include "StateMachine.h"
-#include "DelegateLib.h"
-
-using namespace DelegateLib;
+#include "DelegateMQ.h"
 
 /// @brief Start event data
 struct StartData : public EventData
@@ -19,8 +17,8 @@ class SelfTest : public StateMachine
 {
 public:
 	// Callbacks generated when the self-test completes or fails.
-	MulticastDelegateSafe<void(void)> CompletedCallback;
-	MulticastDelegateSafe<void(void)> FailedCallback;
+	dmq::MulticastDelegateSafe<void(void)> CompletedCallback;
+	dmq::MulticastDelegateSafe<void(void)> FailedCallback;
 
 	SelfTest(INT maxStates);
 
