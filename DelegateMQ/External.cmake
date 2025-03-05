@@ -20,6 +20,17 @@ if(DMQ_TRANSPORT STREQUAL "DMQ_TRANSPORT_ZEROMQ")
         message(FATAL_ERROR "ZeroMQ not found!")
     endif()
 endif()
+
+# MQTT C library
+# https://github.com/eclipse-paho/paho.mqtt.c
+if(DMQ_TRANSPORT STREQUAL "DMQ_TRANSPORT_MQTT")
+    set_and_check(MQTT_INCLUDE_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/include")
+    set_and_check(MQTT_LIBRARY_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/lib")
+    set_and_check(MQTT_BINARY_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/bin")
+    #set_and_check(MQTT_INCLUDE_DIR "/usr/local/include")
+    #set_and_check(MQTT_LIBRARY_DIR "/usr/local/lib")
+    #set_and_check(MQTT_BINARY_DIR "/usr/local/bin/MQTTVersion")
+endif()
     
 # MessagePack C++ library (msgpack.hpp)
 # https://github.com/msgpack/msgpack-c/tree/cpp_master

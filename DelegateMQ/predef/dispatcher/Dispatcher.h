@@ -14,6 +14,8 @@
     #include "predef/transport/win32-pipe/Win32PipeTransport.h"
 #elif defined (DMQ_TRANSPORT_WIN32_UDP)
     #include "predef/transport/win32-udp/Win32UdpTransport.h"
+#elif defined (DMQ_TRANSPORT_MQTT)
+    #include "predef/transport/mqtt/MqttTransport.h"
 #else
     #error "Include a transport header."
 #endif
@@ -39,7 +41,7 @@ public:
     // Send argument data to the transport
     virtual int Dispatch(std::ostream& os, dmq::DelegateRemoteId id) 
     {
-        std::ostringstream* ss = dynamic_cast<std::ostringstream*>(&os);
+        xostringstream* ss = dynamic_cast<xostringstream*>(&os);
         if (!ss)
             return -1;
 
