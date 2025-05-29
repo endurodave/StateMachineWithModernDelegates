@@ -21,21 +21,46 @@ if(DMQ_TRANSPORT STREQUAL "DMQ_TRANSPORT_ZEROMQ")
     endif()
 endif()
 
+# NNG library
+# https://github.com/nanomsg/nng
+if(DMQ_TRANSPORT STREQUAL "DMQ_TRANSPORT_NNG")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set_and_check(NNG_INCLUDE_DIR "${DMQ_ROOT_DIR}/../../../nng/include")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set_and_check(NNG_INCLUDE_DIR "/usr/local/include/nng")
+    endif()
+endif()
+
 # MQTT C library
 # https://github.com/eclipse-paho/paho.mqtt.c
 if(DMQ_TRANSPORT STREQUAL "DMQ_TRANSPORT_MQTT")
-    set_and_check(MQTT_INCLUDE_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/include")
-    set_and_check(MQTT_LIBRARY_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/lib")
-    set_and_check(MQTT_BINARY_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/bin")
-    #set_and_check(MQTT_INCLUDE_DIR "/usr/local/include")
-    #set_and_check(MQTT_LIBRARY_DIR "/usr/local/lib")
-    #set_and_check(MQTT_BINARY_DIR "/usr/local/bin/MQTTVersion")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set_and_check(MQTT_INCLUDE_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/include")
+        set_and_check(MQTT_LIBRARY_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/lib")
+        set_and_check(MQTT_BINARY_DIR "${DMQ_ROOT_DIR}/../../../mqtt/paho-c/bin")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set_and_check(MQTT_INCLUDE_DIR "/usr/local/include")
+        set_and_check(MQTT_LIBRARY_DIR "/usr/local/lib")
+        set_and_check(MQTT_BINARY_DIR "/usr/local/bin/MQTTVersion")
+    endif()
 endif()
     
 # MessagePack C++ library (msgpack.hpp)
 # https://github.com/msgpack/msgpack-c/tree/cpp_master
 if(DMQ_SERIALIZE STREQUAL "DMQ_SERIALIZE_MSGPACK")
     set_and_check(MSGPACK_INCLUDE_DIR "${DMQ_ROOT_DIR}/../../../msgpack-c/include")
+endif()
+
+# Cereal C++ library
+# https://github.com/USCiLab/cereal
+if(DMQ_SERIALIZE STREQUAL "DMQ_SERIALIZE_CEREAL")
+    set_and_check(CEREAL_INCLUDE_DIR "${DMQ_ROOT_DIR}/../../../cereal/include")
+endif()
+
+# Bitsery C++ library
+# https://github.com/fraillt/bitsery
+if(DMQ_SERIALIZE STREQUAL "DMQ_SERIALIZE_BITSERY")
+    set_and_check(BITSERY_INCLUDE_DIR "${DMQ_ROOT_DIR}/../../../bitsery/include")
 endif()
 
 # RapidJSON C++ library
@@ -59,6 +84,12 @@ if(DMQ_THREAD STREQUAL "DMQ_THREAD_FREERTOS")
         "${FREERTOS_ROOT_DIR}/FreeRTOS/Source/portable/MSVC-MingW/port.c"
         "${FREERTOS_ROOT_DIR}/FreeRTOS/Source/portable/MemMang/heap_5.c"
     )
+endif()
+
+# spdlog 
+# https://github.com/gabime/spdlog
+if (DMQ_LOG STREQUAL "ON")
+    set_and_check(SPDLOG_INCLUDE_DIR "${DMQ_ROOT_DIR}/../../../spdlog/include")
 endif()
 
 

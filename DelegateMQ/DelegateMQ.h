@@ -70,17 +70,21 @@
 #elif defined(DMQ_THREAD_NONE)
     // Create a custom application-specific thread
 #else
-    #error "Thread implemention not found."
+    #error "Thread implementation not found."
 #endif
 
 #if defined(DMQ_SERIALIZE_MSGPACK)
     #include "predef/serialize/msgpack/Serializer.h"
+#elif defined(DMQ_SERIALIZE_CEREAL)
+    #include "predef/serialize/cereal/Serializer.h"
+#elif defined(DMQ_SERIALIZE_BITSERY)
+    #include "predef/serialize/bitsery/Serializer.h"
 #elif defined(DMQ_SERIALIZE_RAPIDJSON)
     #include "predef/serialize/rapidjson/Serializer.h"
 #elif defined(DMQ_SERIALIZE_SERIALIZE)
     #include "predef/serialize/serialize/Serializer.h"
 #elif defined(DMQ_SERIALIZE_NONE)
-    // Create a custom application-sepcific serializer
+    // Create a custom application-specific serializer
 #else
     #error "Serialize implementation not found."
 #endif
@@ -88,12 +92,18 @@
 #if defined(DMQ_TRANSPORT_ZEROMQ)
     #include "predef/dispatcher/Dispatcher.h"
     #include "predef/transport/zeromq/ZeroMqTransport.h"
+#elif defined(DMQ_TRANSPORT_NNG)
+    #include "predef/dispatcher/Dispatcher.h"
+    #include "predef/transport/nng/NngTransport.h"
 #elif defined(DMQ_TRANSPORT_WIN32_PIPE)
     #include "predef/dispatcher/Dispatcher.h"
     #include "predef/transport/win32-pipe/Win32PipeTransport.h"
 #elif defined(DMQ_TRANSPORT_WIN32_UDP)
     #include "predef/dispatcher/Dispatcher.h"
     #include "predef/transport/win32-udp/Win32UdpTransport.h"
+#elif defined(DMQ_TRANSPORT_LINUX_UDP)
+    #include "predef/dispatcher/Dispatcher.h"
+    #include "predef/transport/linux-udp/LinuxUdpTransport.h"
 #elif defined(DMQ_TRANSPORT_MQTT)
     #include "predef/dispatcher/Dispatcher.h"
     #include "predef/transport/mqtt/MqttTransport.h"

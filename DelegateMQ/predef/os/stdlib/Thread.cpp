@@ -1,8 +1,7 @@
 #include "Thread.h"
-#include "ThreadMsg.h"
 #include "predef/util/Fault.h"
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <Windows.h>
 #endif
 
@@ -43,6 +42,8 @@ bool Thread::CreateThread()
 
 		// Wait for the thread to enter the Process method
 		m_threadStartFuture.get();
+
+		LOG_INFO("Thread::CreateThread {}", THREAD_NAME);
 	}
 	return true;
 }
@@ -80,7 +81,7 @@ size_t Thread::GetQueueSize()
 //----------------------------------------------------------------------------
 void Thread::SetThreadName(std::thread::native_handle_type handle, const std::string& name)
 {
-#ifdef WIN32
+#ifdef _WIN32
 	// Set the thread name so it shows in the Visual Studio Debug Location toolbar
 	std::wstring wstr(name.begin(), name.end());
 	HRESULT hr = SetThreadDescription(handle, wstr.c_str());
@@ -119,6 +120,8 @@ void Thread::ExitThread()
 		while (!m_queue.empty()) 
 			m_queue.pop();
 	}
+
+	LOG_INFO("Thread::ExitThread {}", THREAD_NAME);
 }
 
 //----------------------------------------------------------------------------
@@ -138,6 +141,10 @@ void Thread::DispatchDelegate(std::shared_ptr<dmq::DelegateMsg> msg)
 	std::unique_lock<std::mutex> lk(m_mutex);
 	m_queue.push(threadMsg);
 	m_cv.notify_one();
+
+	LOG_INFO("Thread::DispatchDelegate\n   thread={}\n   target={}", 
+		THREAD_NAME, 
+		typeid(*threadMsg->GetData()->GetInvoker()).name());
 }
 
 //----------------------------------------------------------------------------
@@ -147,6 +154,8 @@ void Thread::Process()
 {
 	// Signal that the thread has started processing to notify CreateThread
 	m_threadStartPromise.set_value();
+
+	LOG_INFO("Thread::Process {}", THREAD_NAME);
 
 	while (1)
 	{
@@ -160,7 +169,8 @@ void Thread::Process()
 			if (m_queue.empty())
 				continue;
 
-			msg = m_queue.front();
+			// Get highest priority message within queue
+			msg = m_queue.top();
 			m_queue.pop();
 		}
 
