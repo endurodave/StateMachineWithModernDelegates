@@ -12,6 +12,7 @@ A framework combining [C++ State Machine](https://github.com/endurodave/StateMac
 - [C++ State Machine with Asynchronous Delegates](#c-state-machine-with-asynchronous-delegates)
 - [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
+- [Getting Started](#getting-started)
 - [Asynchronous Delegate Callbacks](#asynchronous-delegate-callbacks)
 - [Self-Test Subsystem](#self-test-subsystem)
   - [SelfTestEngine](#selftestengine)
@@ -30,14 +31,20 @@ A framework combining [C++ State Machine](https://github.com/endurodave/StateMac
 
 <p>This repository combines state machines and asynchronous delegates into a single project. The goal for the article is to provide a complete working project with threads, timers, events, and state machines all working together. To illustrate the concept, the example project implements a state-based self-test engine utilizing asynchronous communication between threads.</p>
 
-<p><a href="https://www.cmake.org/">CMake</a>&nbsp;is used to create the build files. CMake is free and open-source software. Windows, Linux and other toolchains are supported. See the <strong>CMakeLists.txt </strong>file for more information.</p>
-
 <p>Related GitHub repositories:</p>
 
 <ul>
     <li><a href="https://github.com/endurodave/DelegateMQ">DelegateMQ in C++</a> - a header-only library enables function invocations on any callable, either synchronously, asynchronously, or on a remote endpoint</li>
     <li><a href="https://github.com/endurodave/StateMachine">State Machine Design in C++</a> - a compact C++ state machine</li>
 </ul>
+
+# Getting Started
+[CMake](https://cmake.org/) is used to create the project build files. See `CMakeLists.txt` for more information.
+
+1. Clone the repository.
+2. From the repository root, run the following CMake command:   
+   `cmake -B Build .`
+3. Build and run the project within the `Build` directory. 
 
 # Asynchronous Delegate Callbacks
 
