@@ -39,7 +39,7 @@ A framework combining [C++ State Machine](https://github.com/endurodave/StateMac
 </ul>
 
 # Getting Started
-[CMake](https://cmake.org/) is used to create the project build files. See `CMakeLists.txt` for more information.
+[CMake](https://cmake.org/) is used to create the project build files on any Windows or Linux machine.
 
 1. Clone the repository.
 2. From the repository root, run the following CMake command:   
