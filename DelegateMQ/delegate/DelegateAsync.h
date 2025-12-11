@@ -42,7 +42,7 @@
 /// * `std::function` compares the function signature type, not the underlying object instance.
 /// See `DelegateFunction<>` class for more info.
 /// 
-/// Code within `<common_code>` and `</common_code>` is updated using sync_src.py. Manually update 
+/// Code within `<common_code>` and `</common_code>` is updated using src_dup.py. Manually update 
 /// the code within the `DelegateFreeAsync` `common_code` tags, then run the script to 
 /// propagate to the remaining delegate classes to simplify code maintenance.
 /// 
@@ -72,6 +72,17 @@ namespace trait
 
     template <typename T>
     struct is_shared_ptr_reference<const std::shared_ptr<T>* > : std::true_type {};
+
+    // Helper trait to check if a type is a double pointer (e.g., int**)
+    template <typename T>
+    struct is_double_pointer {
+        // Remove 'const', 'volatile', and references first
+        using RawT = std::remove_cv_t<std::remove_reference_t<T>>;
+
+        static constexpr bool value =
+            std::is_pointer_v<RawT> &&
+            std::is_pointer_v<std::remove_pointer_t<RawT>>;
+    };
 }
 
 /// @brief Stores all function arguments suitable for non-blocking asynchronous calls.
@@ -153,7 +164,7 @@ public:
     /// @brief Move constructor that transfers ownership of resources.
     /// @param[in] rhs The object to move from.
     DelegateFreeAsync(ClassType&& rhs) noexcept : 
-        BaseType(rhs), m_thread(rhs.m_thread), m_priority(rhs.m_priority) {
+        BaseType(std::move(rhs)), m_thread(rhs.m_thread), m_priority(rhs.m_priority) {
         rhs.Clear();
     }
 
@@ -210,6 +221,7 @@ public:
             BaseType::operator=(std::move(rhs));
             m_thread = rhs.m_thread;    // Use the resource
             m_priority = rhs.m_priority;
+            rhs.Clear();
         }
         return *this;
     }
@@ -427,13 +439,13 @@ public:
     /// @brief Move constructor that transfers ownership of resources.
     /// @param[in] rhs The object to move from.
     DelegateMemberAsync(ClassType&& rhs) noexcept :
-        BaseType(rhs), m_thread(rhs.m_thread), m_priority(rhs.m_priority) {
+        BaseType(std::move(rhs)), m_thread(rhs.m_thread), m_priority(rhs.m_priority) {
         rhs.Clear();
     }
 
     DelegateMemberAsync() = default;
 
-    /// @brief Bind a const member function to the delegate.
+    /// @brief Bind a member function to the delegate.
     /// @details This method associates a member function (`func`) with the delegate. 
     /// Once the function is bound, the delegate can be used to invoke the function.
     /// @param[in] object The target object instance.
@@ -445,7 +457,7 @@ public:
         BaseType::Bind(object, func);
     }
 
-    /// @brief Bind a member function to the delegate.
+    /// @brief Bind a const member function to the delegate.
     /// @details This method associates a member function (`func`) with the delegate. 
     /// Once the function is bound, the delegate can be used to invoke the function.
     /// @param[in] object The target object instance.
@@ -457,7 +469,7 @@ public:
         BaseType::Bind(object, func);
     }
 
-    /// @brief Bind a const member function to the delegate.
+    /// @brief Bind a member function to the delegate.
     /// @details This method associates a member function (`func`) with the delegate. 
     /// Once the function is bound, the delegate can be used to invoke the function.
     /// @param[in] object The target object instance.
@@ -469,7 +481,7 @@ public:
         BaseType::Bind(object, func);
     }
 
-    /// @brief Bind a member function to the delegate.
+    /// @brief Bind a const member function to the delegate.
     /// @details This method associates a member function (`func`) with the delegate. 
     /// Once the function is bound, the delegate can be used to invoke the function.
     /// @param[in] object The target object instance.
@@ -521,6 +533,7 @@ public:
             BaseType::operator=(std::move(rhs));
             m_thread = rhs.m_thread;    // Use the resource
             m_priority = rhs.m_priority;
+            rhs.Clear();
         }
         return *this;
     }
@@ -716,7 +729,7 @@ public:
     /// @brief Move constructor that transfers ownership of resources.
     /// @param[in] rhs The object to move from.
     DelegateFunctionAsync(ClassType&& rhs) noexcept :
-        BaseType(rhs), m_thread(rhs.m_thread), m_priority(rhs.m_priority) {
+        BaseType(std::move(rhs)), m_thread(rhs.m_thread), m_priority(rhs.m_priority) {
         rhs.Clear();
     }
 
@@ -773,6 +786,7 @@ public:
             BaseType::operator=(std::move(rhs));
             m_thread = rhs.m_thread;    // Use the resource
             m_priority = rhs.m_priority;
+            rhs.Clear();
         }
         return *this;
     }

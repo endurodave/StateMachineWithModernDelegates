@@ -59,11 +59,6 @@ int main(void)
 	SelfTestEngine::StatusCallback += MakeDelegate(&SelfTestEngineStatusCallback, userInterfaceThread);
 	SelfTestEngine::GetInstance().CompletedCallback += MakeDelegate(&SelfTestEngineCompleteCallback, userInterfaceThread);
 	
-#if USE_WIN32_THREADS
-	// Start the worker threads
-	ThreadWin::StartAllThreads();
-#endif
-
 	// Start self-test engine
 	StartData startData;
 	startData.shortSelfTest = TRUE;
