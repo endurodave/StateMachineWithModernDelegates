@@ -6,7 +6,6 @@
 using namespace std;
 using namespace dmq;
 
-std::recursive_mutex Timer::m_lock;
 bool Timer::m_timerStopped = false;
 
 //------------------------------------------------------------------------------
@@ -22,7 +21,7 @@ static bool TimerDisabled (Timer* value)
 //------------------------------------------------------------------------------
 Timer::Timer() 
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_lock);
+    const std::lock_guard<std::recursive_mutex> lock(GetLock());
     m_enabled = false;
 }
 
@@ -32,7 +31,7 @@ Timer::Timer()
 Timer::~Timer()
 {
     try {
-        const std::lock_guard<std::recursive_mutex> lock(m_lock);
+        const std::lock_guard<std::recursive_mutex> lock(GetLock());
         auto& timers = GetTimers();
 
         if (timers.size() != 0) {
@@ -56,18 +55,23 @@ void Timer::Start(dmq::Duration timeout, bool once)
     if (timeout <= dmq::Duration(0))
         throw std::invalid_argument("Timeout cannot be 0");
 
-    const std::lock_guard<std::recursive_mutex> lock(m_lock);
+    const std::lock_guard<std::recursive_mutex> lock(GetLock());
 
     m_timeout = timeout;
     m_once = once;
-    m_expireTime = GetTime();
+    m_expireTime = GetNow();
     m_enabled = true;
 
-    // Remove the existing entry, if any, to prevent duplicates in the list
-    GetTimers().remove(this);
+    // If 'this' is the 'next' item in the ProcessTimers loop, removing it 
+    // invalidates the iterator and causes a crash.
+    auto& timers = GetTimers();
+    bool found = (std::find(timers.begin(), timers.end(), this) != timers.end());
 
-    // Add this timer to the list for servicing
-    GetTimers().push_back(this);
+    // Only add if not already in the list. 
+    // If it IS in the list (even if disabled/stopped), we just updated 
+    // its state above, so it is now active again.
+    if (!found) 
+        timers.push_back(this);    
 
     LOG_INFO("Timer::Start timeout={}", m_timeout.count());
 }
@@ -77,12 +81,13 @@ void Timer::Start(dmq::Duration timeout, bool once)
 //------------------------------------------------------------------------------
 void Timer::Stop()
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_lock);
+    const std::lock_guard<std::recursive_mutex> lock(GetLock());
 
     m_enabled = false;
-    m_timerStopped = true;
 
-    GetTimers().remove(this);
+    // Don't remove immediately! Just set a flag.
+    // Let ProcessTimers() handle the actual removal safely using remove_if
+    m_timerStopped = true;
 
     LOG_INFO("Timer::Stop timeout={}", m_timeout.count());
 }
@@ -96,8 +101,8 @@ void Timer::CheckExpired()
         return;
 
     // Has the timer expired?
-    if (Difference(m_expireTime, GetTime()) < m_timeout)
-        return;
+    if (GetNow() < m_expireTime)
+        return;     // Not expired yet
 
     if (m_once)
     {
@@ -109,11 +114,12 @@ void Timer::CheckExpired()
         // Increment the timer to the next expiration
         m_expireTime += m_timeout;
 
-        // Is the timer already expired after we incremented above?
-        if (Difference(m_expireTime, GetTime()) > m_timeout)
+        // Check if we are still behind (timer starvation)
+        // If the new deadline is STILL in the past, we are falling behind.
+        if (GetNow() > m_expireTime)
         {
             // The timer has fallen behind so set time expiration further forward.
-            m_expireTime = GetTime();
+            m_expireTime = GetNow();
 
             // Timer processing is falling behind. Maybe user timer expiration is too 
             // short, time processing takings too long, or CheckExpired not called 
@@ -127,19 +133,11 @@ void Timer::CheckExpired()
 }
 
 //------------------------------------------------------------------------------
-// Difference
-//------------------------------------------------------------------------------
-dmq::Duration Timer::Difference(dmq::Duration time1, dmq::Duration time2)
-{
-    return (time2 - time1);
-}
-
-//------------------------------------------------------------------------------
 // ProcessTimers
 //------------------------------------------------------------------------------
 void Timer::ProcessTimers()
 {
-    const std::lock_guard<std::recursive_mutex> lock(m_lock);
+    const std::lock_guard<std::recursive_mutex> lock(GetLock());
 
     // Remove disabled timer from the list if stopped
     if (m_timerStopped)
@@ -165,10 +163,13 @@ void Timer::ProcessTimers()
     }
 }
 
-dmq::Duration Timer::GetTime()
+//------------------------------------------------------------------------------
+// GetNow
+//------------------------------------------------------------------------------
+dmq::TimePoint Timer::GetNow()
 {
-    auto now = std::chrono::steady_clock::now().time_since_epoch();
-    auto duration = std::chrono::duration_cast<dmq::Duration>(now);
-    return duration;
+    // time_point_cast converts the internal clock resolution (nanos) 
+    // to your custom resolution (millis) inside the time_point wrapper.
+    return std::chrono::time_point_cast<dmq::Duration>(dmq::Clock::now());
 }
 
