@@ -6,13 +6,25 @@
 #include <map>
 #include <cstdint>
 #include <chrono>
-#include <mutex>
 
-/// @brief Monitors remote delegate send message timeouts. Class is thread safe.
-/// Call TransportMonitor::Process() periodically for timeout handling.
-/// Depending on the transport implementation, the message might still be delivered
-/// event if the monitor SendStatusCb callback is invoked. A timeout expiring just means 
-/// that an ack was not received within the time specified.
+/// @brief A thread-safe monitor for tracking outgoing remote messages and detecting timeouts.
+/// 
+/// @details 
+/// The TransportMonitor implements the reliability layer for remote delegate invocations. 
+/// It tracks "in-flight" messages by their sequence number and timestamps them upon sending.
+///
+/// **Key Responsibilities:**
+/// * **Timeout Detection:** Identifies messages that have not been acknowledged within the 
+///   configured `TRANSPORT_TIMEOUT` duration.
+/// * **Status Reporting:** Invokes the `SendStatusCb` delegate with `Status::SUCCESS` (upon ACK) 
+///   or `Status::TIMEOUT` (upon expiration) to notify the application.
+/// * **Thread Safety:** Internal state is protected by a recursive mutex, allowing safe access 
+///   from multiple threads (e.g., sending thread vs. ACK receiving thread).
+///
+/// **Usage Note:**
+/// This class relies on a cooperative polling model. The `Process()` method must be called 
+/// periodically (typically by a background timer or the network thread loop) to scan for 
+/// and handle expired messages.
 class TransportMonitor : public ITransportMonitor
 {
 public:
@@ -29,7 +41,7 @@ public:
     TransportMonitor(const dmq::Duration timeout) : TRANSPORT_TIMEOUT(timeout) {}
     ~TransportMonitor() 
     { 
-        const std::lock_guard<std::recursive_mutex> lock(m_lock);
+        const std::lock_guard<dmq::RecursiveMutex> lock(m_lock);
         m_pending.clear(); 
     }
 
@@ -38,7 +50,7 @@ public:
     /// param[in] remoteId - the remote ID
     virtual void Add(uint16_t seqNum, dmq::DelegateRemoteId remoteId) override
     {
-        const std::lock_guard<std::recursive_mutex> lock(m_lock);
+        const std::lock_guard<dmq::RecursiveMutex> lock(m_lock);
         TimeoutData d;
         d.timeStamp = std::chrono::steady_clock::now();
         d.remoteId = remoteId;
@@ -50,7 +62,7 @@ public:
 	/// param[in] seqNum - the delegate message sequence number
     virtual void Remove(uint16_t seqNum) override
     {
-        const std::lock_guard<std::recursive_mutex> lock(m_lock);
+        const std::lock_guard<dmq::RecursiveMutex> lock(m_lock);
         auto it = m_pending.find(seqNum);
         if (it != m_pending.end())
         {
@@ -63,7 +75,7 @@ public:
 	/// Call periodically to process message timeouts
     void Process()
     {
-        const std::lock_guard<std::recursive_mutex> lock(m_lock);
+        const std::lock_guard<dmq::RecursiveMutex> lock(m_lock);
         auto now = std::chrono::steady_clock::now();
         auto it = m_pending.begin();
         while (it != m_pending.end()) 
@@ -94,7 +106,7 @@ private:
 
 	std::map<uint16_t, TimeoutData> m_pending;
 	const dmq::Duration TRANSPORT_TIMEOUT;
-    std::recursive_mutex m_lock;
+    dmq::RecursiveMutex m_lock;
 };
 
 #endif

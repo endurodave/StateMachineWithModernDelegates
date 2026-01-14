@@ -5,62 +5,95 @@
 // @see https://github.com/endurodave/DelegateMQ
 // David Lafreniere, 2025.
 
-/// @file
-/// @brief DelegateMQ.h is a single include to obtain all delegate functionality. 
+/// @file DelegateMQ.h
+/// @brief A single-include header for the complete DelegateMQ library functionality.
 ///
-/// A C++ delegate library capable of invoking any callable function either synchronously   
-/// or asynchronously on a user specified thread of control. It is also capable of calling
-/// a function remotely over any transport protocol.
-/// 
-/// Asynchronous function calls support both non-blocking and blocking modes with a timeout. 
-/// The library supports all types of target functions, including free functions, class 
-/// member functions, static class functions, lambdas, and `std::function`. It is capable of 
-/// handling any function signature, regardless of the number of arguments or return value. 
-/// All argument types are supported, including by value, pointers, pointers to pointers, 
-/// and references. The delegate library takes care of the intricate details of function 
-/// invocation across thread boundaries. Thread-safe delegate containers stores delegate 
-/// instances with a matching function signature.
-/// 
-///  A delegate instance can be:
+/// @details
+/// DelegateMQ is a robust C++ delegate library that enables invoking any callable function 
+/// (synchronously or asynchronously) on a specific user-defined thread of control. It also 
+/// supports remote function invocation over any transport protocol.
 ///
-/// * Copied freely.
-/// * Compared to same type delegatesand `nullptr`.
-/// * Reassigned.
-/// * Called.
-/// 
-/// Typical use cases are:
+/// **Key Features:**
+/// * **Universal Target Support:** Binds to free functions, class member functions, static functions, 
+///   lambdas, and `std::function`.
+/// * **Any Signature:** Handles any function signature with any number of arguments or return values.
+/// * **Argument Safety:** Supports all argument types (value, pointer, pointer-to-pointer, reference) 
+///   and safely marshals them across thread boundaries for asynchronous calls.
+/// * **Thread Control:** Unlike `std::async` (which uses a random thread pool), DelegateMQ executes 
+///   the target function on a *specific* destination thread you control.
+/// * **Remote Invocation:** Capable of serializing arguments and invoking functions across network 
+///   boundaries (UDP, TCP, ZeroMQ, etc.).
 ///
-/// * Asynchronous Method Invocation(AMI)
-/// * Publish / Subscribe(Observer) Pattern
-/// * Anonymous, Asynchronous Thread - Safe Callbacks
-/// * Event - Driven Programming
-/// * Thread - Safe Asynchronous API
-/// * Design Patterns(Active Object)
+/// **Delegate Capabilities:**
+/// A delegate instance behaves like a first-class object:
+/// * **Copyable:** Can be copied freely.
+/// * **Comparable:** Supports equality checks against other delegates or `nullptr`.
+/// * **Assignable:** Can be reassigned at runtime.
+/// * **Callable:** Invoked via `operator()`.
 ///
-/// The delegate library's asynchronous features differ from `std::async` in that the 
-/// caller-specified thread of control is used to invoke the target function bound to 
-/// the delegate, rather than a random thread from the thread pool. The asynchronous 
-/// variants copy the argument data into the event queue, ensuring safe transport to the 
-/// destination thread, regardless of the argument type. This approach provides 'fire and 
-/// forget' functionality, allowing the caller to avoid waiting or worrying about 
-/// out-of-scope stack variables being accessed by the target thread.
-/// 
-/// The `Async` and `AsyncWait` class variants may throw `std::bad_alloc` if heap allocation 
-/// fails within `operator()(Args... args)`. Alternatively, define `DMQ_ASSERTS` to use `assert`
-/// as opposed to exceptions. All other delegate class functions do not throw exceptions.
-/// 
-/// Github repository location:  
-/// https://github.com/endurodave/DelegateMQ
+/// **Common Use Cases:**
+/// * Asynchronous Method Invocation (AMI) on specific worker threads.
+/// * Publish / Subscribe (Observer) patterns.
+/// * Anonymous, thread-safe asynchronous callbacks.
+/// * Event-Driven Programming architectures.
+/// * Thread-Safe Asynchronous APIs.
+/// * Active Object design patterns.
 ///
-/// See README.md, DETAILS.md, EXAMPLES.md, and source code Doxygen comments for more information.
+/// **Asynchronous Safety:**
+/// Asynchronous variants automatically copy argument data into the event queue. This provides true 
+/// 'fire and forget' functionality, ensuring that out-of-scope stack variables in the caller 
+/// do not cause data races or corruption in the target thread.
+///
+/// **Error Handling:**
+/// The `Async` and `AsyncWait` variants may throw `std::bad_alloc` if heap allocation fails during 
+/// invocation. Alternatively, defining `DMQ_ASSERTS` switches error handling to assertions. 
+/// All other delegate functions are `noexcept`.
+///
+/// **Documentation & Source:**
+/// * Repository: https://github.com/endurodave/DelegateMQ
+/// * See `README.md`, `DETAILS.md`, and `EXAMPLES.md` for comprehensive guides.
 
-#include "delegate/DelegateOpt.h"
-#include "delegate/MulticastDelegateSafe.h"
-#include "delegate/UnicastDelegateSafe.h"
-#include "delegate/SignalSafe.h"
-#include "delegate/DelegateAsync.h"
-#include "delegate/DelegateAsyncWait.h"
+// -----------------------------------------------------------------------------
+// 1. Core Non-Thread-Safe Delegates
+// (Always available: Bare Metal, FreeRTOS, Windows, Linux)
+// -----------------------------------------------------------------------------
+#include "delegate/Delegate.h"
 #include "delegate/DelegateRemote.h"
+#include "delegate/MulticastDelegate.h"
+#include "delegate/UnicastDelegate.h"
+#include "delegate/Signal.h"
+
+// -----------------------------------------------------------------------------
+// 2. Thread-Safe Wrappers (Mutex Only)
+// -----------------------------------------------------------------------------
+// - FreeRTOS: Uses FreeRTOSRecursiveMutex
+// - Bare Metal: Uses NullMutex
+// - StdLib: Uses std::recursive_mutex
+#if defined(DMQ_THREAD_STDLIB) || defined(DMQ_THREAD_FREERTOS) || defined(DMQ_THREAD_NONE)
+    #include "delegate/MulticastDelegateSafe.h"
+    #include "delegate/UnicastDelegateSafe.h"
+    #include "delegate/SignalSafe.h"
+#endif
+
+// -----------------------------------------------------------------------------
+// 3. Asynchronous "Fire and Forget" Delegates
+// -----------------------------------------------------------------------------
+// - FreeRTOS: OK 
+// - Bare Metal: OK (Requires you to implement IThread wrapper for Event Loop)
+// - StdLib: OK
+#if defined(DMQ_THREAD_STDLIB) || defined(DMQ_THREAD_FREERTOS) || defined(DMQ_THREAD_NONE)
+    #include "delegate/DelegateAsync.h"
+#endif
+
+// -----------------------------------------------------------------------------
+// 4. Asynchronous "Blocking" Delegates (Wait for Result)
+// -----------------------------------------------------------------------------
+// - FreeRTOS: NO (Requires Semaphore/Condition Variable)
+// - Bare Metal: NO (Cannot block/sleep)
+// - StdLib: OK
+#if defined(DMQ_THREAD_STDLIB)
+    #include "delegate/DelegateAsyncWait.h"
+#endif
 
 #if defined(DMQ_THREAD_STDLIB)
     #include "predef/os/stdlib/Thread.h"
@@ -69,7 +102,7 @@
     #include "predef/os/freertos/Thread.h"
     #include "predef/os/freertos/ThreadMsg.h"
 #elif defined(DMQ_THREAD_NONE)
-    // Create a custom application-specific thread
+    // Bare metal: User must implement their own polling/interrupt logic
 #else
     #error "Thread implementation not found."
 #endif
@@ -119,8 +152,12 @@
 #endif
 
 #include "predef/util/Fault.h"
-#include "predef/util/Timer.h"
-#include "predef/util/TransportMonitor.h"
-#include "predef/util/AsyncInvoke.h"
+
+// Only include Timer and AsyncInvoke if threads exist
+#if !defined(DMQ_THREAD_NONE)
+    #include "predef/util/Timer.h"
+    #include "predef/util/AsyncInvoke.h"
+    #include "predef/util/TransportMonitor.h"
+#endif
 
 #endif
