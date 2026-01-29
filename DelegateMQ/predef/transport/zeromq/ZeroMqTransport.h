@@ -1,12 +1,28 @@
 #ifndef ZEROMQ_TRANSPORT_H
 #define ZEROMQ_TRANSPORT_H
 
-/// @file 
+/// @file ZeroMqTransport.h
 /// @see https://github.com/endurodave/DelegateMQ
 /// David Lafreniere, 2025.
 /// 
-/// Transport callable argument data to/from a remote using ZeroMQ library. Update 
-/// BUFFER_SIZE below as necessary.
+/// @brief ZeroMQ transport implementation for DelegateMQ.
+/// 
+/// @details
+/// This class implements the ITransport interface using the ZeroMQ high-performance 
+/// asynchronous messaging library. It supports multiple patterns including PAIR (1-to-1) 
+/// and PUB/SUB (1-to-many).
+/// 
+/// Key Features:
+/// 1. **Active Object**: Encapsulates all ZeroMQ socket operations within a dedicated 
+///    worker thread to adhere to ZeroMQ's thread-safety constraints (sockets are not thread-safe).
+/// 2. **Flexible Patterns**: Supports both bidirectional (PAIR) and unidirectional (PUB/SUB)
+///    communication topologies.
+/// 3. **Non-Blocking**: Configures `ZMQ_RCVTIMEO` and `ZMQ_DONTWAIT` to ensure the 
+///    transport remains responsive and never blocks the application indefinitely.
+/// 4. **Reliability**: Integrates with `TransportMonitor` to providing sequence tracking 
+///    and ACKs even over PUB/SUB (when a return channel is available).
+/// 
+/// @note Requires the `libzmq` library.
 
 #include "DelegateMQ.h"
 #include "predef/transport/ITransport.h"
@@ -157,26 +173,39 @@ public:
             return -1;
         }
 
+        // Create a local copy to modify the length
+        DmqHeader headerCopy = header;
+
+        // Calculate payload size and set it on the copy
+        std::string payload = os.str();
+        if (payload.length() > UINT16_MAX) {
+            std::cerr << "Error: Payload too large for 16-bit length." << std::endl;
+            return -1;
+        }
+        headerCopy.SetLength(static_cast<uint16_t>(payload.length()));
+
         xostringstream ss(std::ios::in | std::ios::out | std::ios::binary);
 
-        // Write each header value using the getters from DmqHeader
-        auto marker = header.GetMarker();
+        // Write header values from the COPY
+        auto marker = headerCopy.GetMarker();
         ss.write(reinterpret_cast<const char*>(&marker), sizeof(marker));
 
-        auto id = header.GetId();
+        auto id = headerCopy.GetId();
         ss.write(reinterpret_cast<const char*>(&id), sizeof(id));
 
-        auto seqNum = header.GetSeqNum();
+        auto seqNum = headerCopy.GetSeqNum();
         ss.write(reinterpret_cast<const char*>(&seqNum), sizeof(seqNum));
 
-        // Insert delegate arguments from the stream (os)
-        ss << os.str();
+        auto len = headerCopy.GetLength();
+        ss.write(reinterpret_cast<const char*>(&len), sizeof(len));
+
+        // Insert delegate arguments (payload)
+        ss.write(payload.data(), payload.size());
 
         size_t length = ss.str().length();
 
         if (id != dmq::ACK_REMOTE_ID)
         {
-            // Add sequence number to monitor
             if (m_transportMonitor)
                 m_transportMonitor->Add(seqNum, id);
         }
@@ -249,6 +278,11 @@ public:
         uint16_t seqNum = 0;
         headerStream.read(reinterpret_cast<char*>(&seqNum), sizeof(seqNum));
         header.SetSeqNum(seqNum);
+
+        // Read length using the getter for byte swapping
+        uint16_t length = 0;
+        headerStream.read(reinterpret_cast<char*>(&length), sizeof(length));
+        header.SetLength(length);
 
         // Write the remaining target function argument data to stream
         is.write(m_buffer + DmqHeader::HEADER_SIZE, size - DmqHeader::HEADER_SIZE);

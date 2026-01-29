@@ -6,6 +6,7 @@
 #include <map>
 #include <cstdint>
 #include <chrono>
+#include <vector>
 
 /// @brief A thread-safe monitor for tracking outgoing remote messages and detecting timeouts.
 /// 
@@ -34,11 +35,16 @@ public:
         TIMEOUT   // Message timeout
     };
 
-    // Delegate callback to monitor message send status. Callback invoked by 
-    // either the Remove() caller's thread or the Process() caller's thread.
-    dmq::MulticastDelegateSafe<void(dmq::DelegateRemoteId id, uint16_t seqNum, Status status)> SendStatusCb;
+    /// Signal emitted when a message status is determined.
+    /// Subscribers receive: (remoteId, seqNum, status)
+    /// Use a shared_ptr for the signal as required by SignalSafe
+    std::shared_ptr<dmq::SignalSafe<void(dmq::DelegateRemoteId, uint16_t, Status)>> OnSendStatus;
 
-    TransportMonitor(const dmq::Duration timeout) : TRANSPORT_TIMEOUT(timeout) {}
+    TransportMonitor(const dmq::Duration timeout) : TRANSPORT_TIMEOUT(timeout) 
+    {
+        OnSendStatus = dmq::MakeSignal<void(dmq::DelegateRemoteId, uint16_t, Status)>();
+    }
+
     ~TransportMonitor() 
     { 
         const std::lock_guard<dmq::RecursiveMutex> lock(m_lock);
@@ -68,31 +74,50 @@ public:
         {
             TimeoutData d = it->second;
             m_pending.erase(it);
-            SendStatusCb(d.remoteId, seqNum, Status::SUCCESS);
+            if (OnSendStatus)
+                (*OnSendStatus)(d.remoteId, seqNum, Status::SUCCESS);
         }
     }
 
 	/// Call periodically to process message timeouts
     void Process()
     {
-        const std::lock_guard<dmq::RecursiveMutex> lock(m_lock);
-        auto now = std::chrono::steady_clock::now();
-        auto it = m_pending.begin();
-        while (it != m_pending.end()) 
-        {
-            // Calculate the elapsed time as a duration
-            auto elapsed = std::chrono::duration_cast<dmq::Duration>(now - (*it).second.timeStamp);
+        // 1. Collect expired items into a local list
+        struct ExpiredItem { uint16_t seq; TimeoutData data; };
+        std::vector<ExpiredItem> expiredItems;
 
-            // Has message timeout expired?
-            if (elapsed > TRANSPORT_TIMEOUT)
+        {
+            // Lock ONLY while reading/modifying the map
+            const std::lock_guard<dmq::RecursiveMutex> lock(m_lock);
+            auto now = std::chrono::steady_clock::now();
+            auto it = m_pending.begin();
+
+            while (it != m_pending.end())
             {
-                SendStatusCb((*it).second.remoteId, (*it).first, Status::TIMEOUT);
-                LOG_ERROR("TransportMonitor::Process TIMEOUT {} {}", (*it).second.remoteId, (*it).first);
-                it = m_pending.erase(it);                
+                auto elapsed = std::chrono::duration_cast<dmq::Duration>(now - (*it).second.timeStamp);
+
+                if (elapsed > TRANSPORT_TIMEOUT)
+                {
+                    expiredItems.push_back({ (*it).first, (*it).second });
+                    it = m_pending.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
             }
-            else 
+        } // Lock is RELEASED here
+
+        // 2. Fire callbacks without holding the lock
+        // This prevents the deadlock: Process(Lock A) -> Callback -> Send -> Transport(Wait for Thread B)
+        // Meanwhile Thread B -> Send -> Add(Wait for Lock A)
+        if (OnSendStatus && !expiredItems.empty())
+        {
+            for (const auto& item : expiredItems)
             {
-                ++it;
+                // Simple logging to console
+                std::cerr << "TransportMonitor::Process TIMEOUT RemoteID: " << item.data.remoteId << " Seq: " << item.seq << std::endl;
+                (*OnSendStatus)(item.data.remoteId, item.seq, Status::TIMEOUT);
             }
         }
     }
